@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Free Games Tracker — every free drop, one place</title>
+    <meta
+      name="description"
+      content="Track free games, free weekends, and trials across Steam, Epic, GOG, PlayStation, Xbox, Switch, and mobile."
+    />
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#060608" />
+    <link rel="icon" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+
+    <!-- Prevent a light->dark flash: read the persisted theme before React
+         mounts and set the class immediately. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("fgt-theme");
+          var dark = stored ? stored === "dark" : true;
+          if (dark) document.documentElement.classList.add("dark");
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/sw.js").catch(() => {});
+        });
+      }
+    </script>
+  </body>
+</html>

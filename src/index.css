@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+/* v4 dropped the `darkMode: "class"` JS config option — this is the CSS
+   equivalent, so `dark:` utilities key off the .dark class on <html>
+   (toggled in ThemeContext.jsx) instead of the OS preference. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Tailwind v4 config lives in CSS, not tailwind.config.js. Everything
+   that used to be theme.extend in the old config is here instead. */
+@theme {
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  /* Custom breakpoints, mobile-first. `--breakpoint-xs` gives us an
+     `xs:` variant. Very small square/round displays (watches) are
+     handled separately in App.jsx via a compound width+height
+     arbitrary media query, since Tailwind's screens are min-width only
+     and a watch needs a max-width+max-height check. */
+  --breakpoint-xs: 400px;
+
+  /* Platform brand accents — real utility classes (bg-steam, text-xbox,
+     etc). Per-card dynamic theming still reads from src/lib/platforms.js
+     since that's chosen at runtime per giveaway; keep the two in sync
+     if you tweak a color. */
+  --color-steam: #2fb4ff;
+  --color-steam-dark: #0a2e4a;
+  --color-epic: #9a9aa5;
+  --color-epic-dark: #1a1a1a;
+  --color-gog: #b366ff;
+  --color-gog-dark: #2c1150;
+  --color-playstation: #2f8fff;
+  --color-playstation-dark: #06264f;
+  --color-xbox: #4bdc3d;
+  --color-xbox-dark: #0c2b0a;
+  --color-switch: #ff4646;
+  --color-switch-dark: #420c0c;
+  --color-pc: #38bdf8;
+  --color-pc-dark: #0c2233;
+
+  --color-brand-fuchsia: #e879f9;
+  --color-brand-violet: #7c3aed;
+  --color-brand-cyan: #0ea5e9;
+
+  --animate-card-in: cardIn 0.6s ease-out forwards;
+  --animate-pulse-dot: pulseDot 1.6s ease infinite;
+  --animate-scan: scan 6s linear infinite;
+  --animate-grid-drift: gridDrift 10s linear infinite;
+}
+
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes pulseDot {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.4);
+  }
+}
+@keyframes scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+@keyframes gridDrift {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 60px 60px;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Smooth, non-jarring dark/light transition on the handful of properties
+   that actually change — avoid `transition: all`, a common source of
+   jank on low-power phones. */
+.theme-transition {
+  transition:
+    background-color 0.45s ease,
+    border-color 0.45s ease,
+    color 0.3s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Touch targets: enforce a sane minimum on anything meant to be tapped. */
+.tap-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.4);
+  border-radius: 999px;
+}
