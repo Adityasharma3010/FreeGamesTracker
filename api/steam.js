@@ -12,7 +12,7 @@
 //    without notice. Wrapped in its own try/catch so a wishlist failure
 //    never takes down the library data too.
 
-const STEAM_API_KEY = process.env.STEAM_API_KEY;
+const STEAM_API_KEY = process.env.VITE_STEAM_API_KEY;
 
 async function resolveVanityUrl(vanity) {
   const url = `https://api.steampowered.com/ISteamUser/ResolveVanityURL/v1/?key=${STEAM_API_KEY}&vanityurl=${encodeURIComponent(vanity)}`;
@@ -44,7 +44,10 @@ async function fetchWishlist(steamid) {
   for (let i = 0; i < 15; i++) {
     const url = `https://store.steampowered.com/wishlist/profiles/${steamid}/wishlistdata/?p=${page}`;
     const res = await fetch(url, {
-      headers: { "User-Agent": "FreeGamesTrackerBot/1.0 (+https://github.com/Adityasharma3010/FreeGamesTracker)" },
+      headers: {
+        "User-Agent":
+          "FreeGamesTrackerBot/1.0 (+https://github.com/Adityasharma3010/FreeGamesTracker)",
+      },
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) break;
@@ -61,13 +64,20 @@ async function fetchWishlist(steamid) {
 
 export default async function handler(req, res) {
   if (!STEAM_API_KEY) {
-    res.status(500).json({ error: "STEAM_API_KEY is not configured on the server." });
+    res
+      .status(500)
+      .json({ error: "STEAM_API_KEY is not configured on the server." });
     return;
   }
 
   const { steamid, vanity } = req.query;
   if (!steamid && !vanity) {
-    res.status(400).json({ error: "Provide either ?steamid= (64-bit ID) or ?vanity= (custom URL name)." });
+    res
+      .status(400)
+      .json({
+        error:
+          "Provide either ?steamid= (64-bit ID) or ?vanity= (custom URL name).",
+      });
     return;
   }
 
@@ -76,7 +86,12 @@ export default async function handler(req, res) {
     if (!id && vanity) {
       id = await resolveVanityUrl(vanity);
       if (!id) {
-        res.status(404).json({ error: "Couldn't resolve that Steam profile name. Double-check it, or use your SteamID64 instead." });
+        res
+          .status(404)
+          .json({
+            error:
+              "Couldn't resolve that Steam profile name. Double-check it, or use your SteamID64 instead.",
+          });
         return;
       }
     }
@@ -86,7 +101,10 @@ export default async function handler(req, res) {
       fetchWishlist(id).catch(() => []), // wishlist failing shouldn't sink library data
     ]);
 
-    res.setHeader("Cache-Control", "public, s-maxage=900, stale-while-revalidate=1800");
+    res.setHeader(
+      "Cache-Control",
+      "public, s-maxage=900, stale-while-revalidate=1800",
+    );
     res.status(200).json({
       steamid: id,
       libraryPublic: library.public,
@@ -94,6 +112,8 @@ export default async function handler(req, res) {
       wishlistAppIds,
     });
   } catch (err) {
-    res.status(502).json({ error: "Steam didn't respond — try again in a moment." });
+    res
+      .status(502)
+      .json({ error: "Steam didn't respond — try again in a moment." });
   }
 }
