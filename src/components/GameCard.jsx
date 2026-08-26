@@ -1,7 +1,12 @@
 import React, { useState } from "react";
 import { useTheme } from "../context/ThemeContext.jsx";
+import { useFavorites } from "../context/FavoritesContext.jsx";
+import { useSteam } from "../context/SteamContext.jsx";
 import { primaryPlatformFor, typeKeyFor, TYPES, isLight } from "../lib/platforms.js";
+import { extractSteamAppId } from "../lib/steamMatch.js";
 import PlatformIcon from "./PlatformIcon.jsx";
+import { LuStar } from "react-icons/lu";
+import { SiSteam } from "react-icons/si";
 
 function formatEndDate(end_date) {
   if (!end_date || end_date === "N/A") return "No end date listed";
@@ -12,12 +17,23 @@ function formatEndDate(end_date) {
 
 export default function GameCard({ giveaway, index }) {
   const { theme, dark } = useTheme();
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const { connected: steamConnected, isWishlisted } = useSteam();
   const [hover, setHover] = useState(false);
   const [imgOk, setImgOk] = useState(true);
 
   const p = primaryPlatformFor(giveaway.platforms);
   const typeKey = typeKeyFor(giveaway.type);
   const t = TYPES[typeKey];
+  const saved = isFavorite(giveaway.id);
+
+  const steamAppId = extractSteamAppId(giveaway.open_giveaway_url || giveaway.gamerpower_url);
+  const wishlisted = steamConnected && isWishlisted(steamAppId);
+  // NOTE: "owned game has free DLC" isn't implemented yet — a DLC's own
+  // Steam App ID isn't the same ID as its base game's, so checking it
+  // against the library directly would be wrong. That needs a separate
+  // Steam Store lookup per DLC entry to resolve the base game first
+  // (see README) — scoped out of this round rather than shown inaccurately.
 
   return (
     <div
@@ -33,7 +49,7 @@ export default function GameCard({ giveaway, index }) {
       }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      className="motion-safe:opacity-0 motion-safe:animate-card-in relative rounded-md transition-transform duration-300 ease-out will-change-transform hover:-translate-y-1.5 active:translate-y-0 flex flex-col"
+      className="group motion-safe:opacity-0 motion-safe:animate-card-in relative rounded-md transition-transform duration-300 ease-out will-change-transform hover:-translate-y-1.5 active:translate-y-0 flex flex-col"
     >
       <span className="absolute top-2.5 right-3.5 w-1.5 h-1.5 rounded-full" style={{ background: p.a, boxShadow: `0 0 6px ${p.a}` }} />
       <span className="absolute bottom-2.5 left-3.5 w-1.5 h-1.5 rounded-full" style={{ background: p.a, boxShadow: `0 0 6px ${p.a}` }} />
@@ -52,6 +68,21 @@ export default function GameCard({ giveaway, index }) {
           {t.chip}
         </span>
       </div>
+
+      {/* Steam wishlist callout — a distinct gold accent so it reads as
+          "this is about YOU specifically", separate from the platform's
+          own color language used everywhere else. */}
+      {wishlisted && (
+        <div
+          className="flex items-center gap-1.5 px-3.5 py-1.5"
+          style={{ background: "linear-gradient(90deg, #fbbf24, #f59e0b)" }}
+        >
+          <SiSteam size={12} color="#151517" />
+          <span className="text-[10px] font-black uppercase tracking-wide" style={{ color: "#151517" }}>
+            On your Steam wishlist
+          </span>
+        </div>
+      )}
 
       {/* thumbnail */}
       <div className="relative mx-3.5 mt-3 h-32 sm:h-28 rounded-sm overflow-hidden" style={{ background: `linear-gradient(135deg, ${p.a}55, ${p.d})` }}>
@@ -73,6 +104,32 @@ export default function GameCard({ giveaway, index }) {
             <PlatformIcon platformKey={p.key} size={48} style={{ color: p.a }} />
           </span>
         )}
+
+        {/* Save/favorite toggle. Hover-to-reveal only where hover is a
+            real input method (mouse) — `[@media(hover:hover)]` is a
+            genuine capability check, not a screen-size guess, so it
+            correctly stays always-visible on touch devices regardless
+            of their width. */}
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleFavorite(giveaway);
+          }}
+          aria-label={saved ? "Remove from favorites" : "Save to favorites"}
+          aria-pressed={saved}
+          className={[
+            "tap-target absolute top-1.5 right-1.5 w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90",
+            saved ? "opacity-100" : "opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100",
+          ].join(" ")}
+          style={{
+            background: saved ? p.a : "rgba(0,0,0,0.5)",
+            boxShadow: saved ? `0 0 14px ${p.a}bb` : "none",
+            backdropFilter: "blur(4px)",
+          }}
+        >
+          <LuStar size={16} color={saved ? (isLight(p.a) ? "#151517" : "#fff") : "#fff"} fill={saved ? "currentColor" : "none"} />
+        </button>
       </div>
 
       {/* body */}

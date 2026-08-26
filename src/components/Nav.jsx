@@ -1,5 +1,7 @@
 import React from "react";
 import { useTheme } from "../context/ThemeContext.jsx";
+import { LuGamepad2, LuSun, LuMoon } from "react-icons/lu";
+import SteamConnect from "./SteamConnect.jsx";
 
 export default function Nav() {
   const { theme, dark, setDark } = useTheme();
@@ -9,33 +11,36 @@ export default function Nav() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
           <div
-            className="w-9 h-9 flex items-center justify-center text-base font-black text-white shrink-0"
+            className="w-9 h-9 flex items-center justify-center shrink-0"
             style={{ background: "linear-gradient(135deg,#a855f7,#ec4899)", clipPath: "polygon(0 8px,8px 0,100% 0,100% 100%,0 100%)", boxShadow: "0 0 18px rgba(217,70,239,0.6)" }}
           >
-            🕹
+            <LuGamepad2 size={19} color="#fff" />
           </div>
           <span className="font-black tracking-tight text-base sm:text-lg truncate" style={{ color: theme.text }}>
             FREE<span className="text-fuchsia-500">GAMES</span>TRACKER
           </span>
         </div>
 
-        <div className="flex items-center gap-1 p-1 rounded-full border-2 shrink-0" style={{ background: theme.surface, borderColor: theme.surfaceBorder }}>
-          <button
-            onClick={() => setDark(false)}
-            aria-label="Light mode"
-            className="tap-target px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-200 flex items-center gap-1"
-            style={!dark ? { background: "#fbbf24", color: "#111", boxShadow: "0 0 12px #fbbf2488" } : { color: theme.toggleInactive }}
-          >
-            ☀️<span className="hidden xs:inline">Light</span>
-          </button>
-          <button
-            onClick={() => setDark(true)}
-            aria-label="Dark mode"
-            className="tap-target px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-200 flex items-center gap-1"
-            style={dark ? { background: "#7c3aed", color: "#fff", boxShadow: "0 0 12px #7c3aed88" } : { color: theme.toggleInactive }}
-          >
-            🌙<span className="hidden xs:inline">Dark</span>
-          </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <SteamConnect />
+          <div className="flex items-center gap-1 p-1 rounded-full border-2 shrink-0" style={{ background: theme.surface, borderColor: theme.surfaceBorder }}>
+            <button
+              onClick={() => setDark(false)}
+              aria-label="Light mode"
+              className="tap-target px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-200 flex items-center gap-1"
+              style={!dark ? { background: "#fbbf24", color: "#111", boxShadow: "0 0 12px #fbbf2488" } : { color: theme.toggleInactive }}
+            >
+              <LuSun size={14} /><span className="hidden xs:inline">Light</span>
+            </button>
+            <button
+              onClick={() => setDark(true)}
+              aria-label="Dark mode"
+              className="tap-target px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-200 flex items-center gap-1"
+              style={dark ? { background: "#7c3aed", color: "#fff", boxShadow: "0 0 12px #7c3aed88" } : { color: theme.toggleInactive }}
+            >
+              <LuMoon size={14} /><span className="hidden xs:inline">Dark</span>
+            </button>
+          </div>
         </div>
       </div>
     </nav>

@@ -78,7 +78,7 @@ export default function TrialNewsBadge() {
             </div>
             <button
               onClick={() => setOpen(false)}
-              className="tap-target shrink-0 flex items-center justify-center"
+              className="tap-target shrink-0 flex items-center justify-center cursor-pointer"
               style={{ color: theme.textFaint }}
               aria-label="Close"
             >
@@ -128,7 +128,7 @@ export default function TrialNewsBadge() {
 
       <button
         onClick={() => setOpen((o) => !o)}
-        className="tap-target flex items-center gap-2 px-4 py-3 rounded-full border-2 font-black text-[12.5px] uppercase tracking-wide transition-all duration-200 hover:scale-105 active:scale-95"
+        className="tap-target flex items-center gap-2 px-4 py-3 rounded-full border-2 font-black text-[12.5px] cursor-pointer uppercase tracking-wide transition-all duration-200 hover:scale-105 active:scale-95"
         style={{
           background: theme.panelBg,
           borderColor: "#e879f9",
