@@ -8,6 +8,7 @@ import Filters from "./components/Filters.jsx";
 import GameGrid from "./components/GameGrid.jsx";
 import WatchView from "./components/WatchView.jsx";
 import AmbientBackground from "./components/AmbientBackground.jsx";
+import TrialNewsSection from "./components/TrialNewsSection.jsx";
 
 function endTimestamp(g) {
   if (!g.end_date || g.end_date === "N/A") return Infinity; // no end date sorts last
@@ -79,6 +80,8 @@ export default function App() {
           <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-9 relative z-10">
             <GameGrid giveaways={filtered} status={status} error={error} onRetry={refresh} />
           </main>
+
+          <TrialNewsSection />
 
           <footer className="max-w-6xl mx-auto px-4 sm:px-6 pb-10 text-center text-[11px] font-semibold" style={{ color: theme.textFaint }}>
             Not affiliated with Steam, Epic Games, GOG, PlayStation, Xbox, or Nintendo — "Claim" opens the official store page.
