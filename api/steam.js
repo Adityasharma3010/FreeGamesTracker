@@ -12,7 +12,7 @@
 //    without notice. Wrapped in its own try/catch so a wishlist failure
 //    never takes down the library data too.
 
-const STEAM_API_KEY = process.env.VITE_STEAM_API_KEY;
+const STEAM_API_KEY = process.env.STEAM_API_KEY;
 
 async function resolveVanityUrl(vanity) {
   const url = `https://api.steampowered.com/ISteamUser/ResolveVanityURL/v1/?key=${STEAM_API_KEY}&vanityurl=${encodeURIComponent(vanity)}`;
