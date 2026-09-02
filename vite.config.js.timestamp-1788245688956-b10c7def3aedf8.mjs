@@ -1,0 +1,28 @@
+// vite.config.js
+import { defineConfig } from "file:///D:/Javascript/Projects/FreeGamesTracker/node_modules/vite/dist/node/index.js";
+import react from "file:///D:/Javascript/Projects/FreeGamesTracker/node_modules/@vitejs/plugin-react/dist/index.js";
+import tailwindcss from "file:///D:/Javascript/Projects/FreeGamesTracker/node_modules/@tailwindcss/vite/dist/index.mjs";
+var vite_config_default = defineConfig({
+  plugins: [react(), tailwindcss()],
+  // Bind the dev server to all network interfaces, not just localhost —
+  // this is what actually makes it reachable from other devices on your
+  // LAN (e.g. testing on your phone). Setting it here instead of relying
+  // on a `--host` CLI flag matters specifically for `vercel dev`: it
+  // runs whatever's in package.json's "dev" script and only overrides
+  // the port, it does NOT forward extra flags like `--listen` down to
+  // Vite — confirmed by Vite's own dev-server log saying "use --host to
+  // expose" even when `--listen 0.0.0.0:PORT` was passed to `vercel dev`.
+  // Configuring it here works for both `npm run dev` and `vercel dev`
+  // uniformly, since both ultimately launch this same Vite config.
+  server: {
+    host: true
+  },
+  build: {
+    outDir: "dist",
+    sourcemap: false
+  }
+});
+export {
+  vite_config_default as default
+};
+//# sourceMappingURL=data:application/json;base64,ewogICJ2ZXJzaW9uIjogMywKICAic291cmNlcyI6IFsidml0ZS5jb25maWcuanMiXSwKICAic291cmNlc0NvbnRlbnQiOiBbImNvbnN0IF9fdml0ZV9pbmplY3RlZF9vcmlnaW5hbF9kaXJuYW1lID0gXCJEOlxcXFxKYXZhc2NyaXB0XFxcXFByb2plY3RzXFxcXEZyZWVHYW1lc1RyYWNrZXJcIjtjb25zdCBfX3ZpdGVfaW5qZWN0ZWRfb3JpZ2luYWxfZmlsZW5hbWUgPSBcIkQ6XFxcXEphdmFzY3JpcHRcXFxcUHJvamVjdHNcXFxcRnJlZUdhbWVzVHJhY2tlclxcXFx2aXRlLmNvbmZpZy5qc1wiO2NvbnN0IF9fdml0ZV9pbmplY3RlZF9vcmlnaW5hbF9pbXBvcnRfbWV0YV91cmwgPSBcImZpbGU6Ly8vRDovSmF2YXNjcmlwdC9Qcm9qZWN0cy9GcmVlR2FtZXNUcmFja2VyL3ZpdGUuY29uZmlnLmpzXCI7aW1wb3J0IHsgZGVmaW5lQ29uZmlnIH0gZnJvbSBcInZpdGVcIjtcbmltcG9ydCByZWFjdCBmcm9tIFwiQHZpdGVqcy9wbHVnaW4tcmVhY3RcIjtcbmltcG9ydCB0YWlsd2luZGNzcyBmcm9tIFwiQHRhaWx3aW5kY3NzL3ZpdGVcIjtcblxuLy8gU3RhdGljIGJ1aWxkLCBubyBzZXJ2ZXItc2lkZSBjb2RlIFx1MjAxNCBkZXBsb3lzIGFzIHBsYWluIEhUTUwvSlMvQ1NTIHRvXG4vLyBWZXJjZWwgLyBOZXRsaWZ5IC8gR2l0SHViIFBhZ2VzLCBhbmQgaXMgdGhlIHNhbWUgYnVuZGxlIEJ1YmJsZXdyYXBcbi8vIHdpbGwgd3JhcCBpbnRvIHRoZSBBbmRyb2lkIEFQSyBsYXRlci5cbmV4cG9ydCBkZWZhdWx0IGRlZmluZUNvbmZpZyh7XG4gIHBsdWdpbnM6IFtyZWFjdCgpLCB0YWlsd2luZGNzcygpXSxcbiAgLy8gQmluZCB0aGUgZGV2IHNlcnZlciB0byBhbGwgbmV0d29yayBpbnRlcmZhY2VzLCBub3QganVzdCBsb2NhbGhvc3QgXHUyMDE0XG4gIC8vIHRoaXMgaXMgd2hhdCBhY3R1YWxseSBtYWtlcyBpdCByZWFjaGFibGUgZnJvbSBvdGhlciBkZXZpY2VzIG9uIHlvdXJcbiAgLy8gTEFOIChlLmcuIHRlc3Rpbmcgb24geW91ciBwaG9uZSkuIFNldHRpbmcgaXQgaGVyZSBpbnN0ZWFkIG9mIHJlbHlpbmdcbiAgLy8gb24gYSBgLS1ob3N0YCBDTEkgZmxhZyBtYXR0ZXJzIHNwZWNpZmljYWxseSBmb3IgYHZlcmNlbCBkZXZgOiBpdFxuICAvLyBydW5zIHdoYXRldmVyJ3MgaW4gcGFja2FnZS5qc29uJ3MgXCJkZXZcIiBzY3JpcHQgYW5kIG9ubHkgb3ZlcnJpZGVzXG4gIC8vIHRoZSBwb3J0LCBpdCBkb2VzIE5PVCBmb3J3YXJkIGV4dHJhIGZsYWdzIGxpa2UgYC0tbGlzdGVuYCBkb3duIHRvXG4gIC8vIFZpdGUgXHUyMDE0IGNvbmZpcm1lZCBieSBWaXRlJ3Mgb3duIGRldi1zZXJ2ZXIgbG9nIHNheWluZyBcInVzZSAtLWhvc3QgdG9cbiAgLy8gZXhwb3NlXCIgZXZlbiB3aGVuIGAtLWxpc3RlbiAwLjAuMC4wOlBPUlRgIHdhcyBwYXNzZWQgdG8gYHZlcmNlbCBkZXZgLlxuICAvLyBDb25maWd1cmluZyBpdCBoZXJlIHdvcmtzIGZvciBib3RoIGBucG0gcnVuIGRldmAgYW5kIGB2ZXJjZWwgZGV2YFxuICAvLyB1bmlmb3JtbHksIHNpbmNlIGJvdGggdWx0aW1hdGVseSBsYXVuY2ggdGhpcyBzYW1lIFZpdGUgY29uZmlnLlxuICBzZXJ2ZXI6IHtcbiAgICBob3N0OiB0cnVlLFxuICB9LFxuICBidWlsZDoge1xuICAgIG91dERpcjogXCJkaXN0XCIsXG4gICAgc291cmNlbWFwOiBmYWxzZSxcbiAgfSxcbn0pO1xuIl0sCiAgIm1hcHBpbmdzIjogIjtBQUErUyxTQUFTLG9CQUFvQjtBQUM1VSxPQUFPLFdBQVc7QUFDbEIsT0FBTyxpQkFBaUI7QUFLeEIsSUFBTyxzQkFBUSxhQUFhO0FBQUEsRUFDMUIsU0FBUyxDQUFDLE1BQU0sR0FBRyxZQUFZLENBQUM7QUFBQTtBQUFBO0FBQUE7QUFBQTtBQUFBO0FBQUE7QUFBQTtBQUFBO0FBQUE7QUFBQTtBQUFBLEVBV2hDLFFBQVE7QUFBQSxJQUNOLE1BQU07QUFBQSxFQUNSO0FBQUEsRUFDQSxPQUFPO0FBQUEsSUFDTCxRQUFRO0FBQUEsSUFDUixXQUFXO0FBQUEsRUFDYjtBQUNGLENBQUM7IiwKICAibmFtZXMiOiBbXQp9Cg==

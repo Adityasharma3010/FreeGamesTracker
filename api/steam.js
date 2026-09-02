@@ -23,7 +23,7 @@ async function resolveVanityUrl(vanity) {
 }
 
 async function fetchLibrary(steamid) {
-  const url = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${STEAM_API_KEY}&steamid=${steamid}&include_appinfo=0&include_played_free_games=1&format=json`;
+  const url = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${STEAM_API_KEY}&steamid=${steamid}&include_appinfo=1&include_played_free_games=1&format=json`;
   const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
   const data = await res.json();
   // Steam returns an EMPTY response body (no "games" key) when the
@@ -32,12 +32,22 @@ async function fetchLibrary(steamid) {
   const games = data?.response?.games;
   return {
     public: Array.isArray(games),
-    appIds: Array.isArray(games) ? games.map((g) => g.appid) : [],
+    games: Array.isArray(games)
+      ? games
+          .map((g) => ({
+            appid: g.appid,
+            name: g.name || `App ${g.appid}`,
+            icon: g.img_icon_url
+              ? `https://media.steampowered.com/steamcommunity/public/images/apps/${g.appid}/${g.img_icon_url}.jpg`
+              : null,
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      : [],
   };
 }
 
 async function fetchWishlist(steamid) {
-  const appIds = [];
+  const games = [];
   let page = 0;
   // Paginated, ~1000 items/page historically — cap pages defensively
   // so a malformed response can't loop forever.
@@ -53,13 +63,20 @@ async function fetchWishlist(steamid) {
     if (!res.ok) break;
     const data = await res.json().catch(() => null);
     if (!data || typeof data !== "object" || Array.isArray(data)) break;
-    const ids = Object.keys(data);
-    if (ids.length === 0) break;
-    appIds.push(...ids.map(Number));
+    const entries = Object.entries(data);
+    if (entries.length === 0) break;
+    for (const [appid, info] of entries) {
+      games.push({
+        appid: Number(appid),
+        name: info?.name || `App ${appid}`,
+        icon: info?.capsule || null,
+        priority: typeof info?.priority === "number" ? info.priority : 9999,
+      });
+    }
     page++;
-    if (ids.length < 1000) break; // last page
+    if (entries.length < 1000) break; // last page
   }
-  return appIds;
+  return games.sort((a, b) => a.priority - b.priority);
 }
 
 export default async function handler(req, res) {
@@ -96,7 +113,7 @@ export default async function handler(req, res) {
       }
     }
 
-    const [library, wishlistAppIds] = await Promise.all([
+    const [library, wishlistGames] = await Promise.all([
       fetchLibrary(id),
       fetchWishlist(id).catch(() => []), // wishlist failing shouldn't sink library data
     ]);
@@ -108,8 +125,8 @@ export default async function handler(req, res) {
     res.status(200).json({
       steamid: id,
       libraryPublic: library.public,
-      libraryAppIds: library.appIds,
-      wishlistAppIds,
+      libraryGames: library.games,
+      wishlistGames,
     });
   } catch (err) {
     res

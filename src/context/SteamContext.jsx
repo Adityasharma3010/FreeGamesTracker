@@ -10,8 +10,11 @@ const SteamContext = createContext(null);
 const MOCK_DATA = {
   steamid: "MOCK",
   libraryPublic: true,
-  libraryAppIds: [730, 570], // CS2, Dota 2 — arbitrary sample IDs
-  wishlistAppIds: [1245620], // Elden Ring — arbitrary sample ID
+  libraryGames: [
+    { appid: 730, name: "Counter-Strike 2", icon: null },
+    { appid: 570, name: "Dota 2", icon: null },
+  ],
+  wishlistGames: [{ appid: 1245620, name: "Elden Ring", icon: null }],
 };
 
 export function SteamProvider({ children }) {
@@ -23,9 +26,36 @@ export function SteamProvider({ children }) {
       return null;
     }
   });
-  const [data, setData] = useState(null); // { steamid, libraryPublic, libraryAppIds, wishlistAppIds }
+  const [data, setData] = useState(null); // { steamid, libraryPublic, libraryGames, wishlistGames }
   const [status, setStatus] = useState("idle"); // idle | loading | success | error
   const [error, setError] = useState(null);
+
+  // Picks up the ?steamid= (or ?steamAuthError=1) param that
+  // api/auth/steam-callback.js redirects back to after a successful (or
+  // failed) "Sign in through Steam" login, then strips it from the URL
+  // so it isn't left visible/bookmarkable/re-triggered on refresh.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const loggedInId = url.searchParams.get("steamid");
+    const authError = url.searchParams.get("steamAuthError");
+
+    if (loggedInId && /^\d{17}$/.test(loggedInId)) {
+      const next = { input: loggedInId, steamid: loggedInId };
+      setProfile(next);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      } catch {}
+    } else if (authError) {
+      setError("Steam sign-in didn't complete — please try again.");
+      setStatus("error");
+    }
+
+    if (loggedInId || authError) {
+      url.searchParams.delete("steamid");
+      url.searchParams.delete("steamAuthError");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, []);
 
   useEffect(() => {
     if (!profile) {
@@ -95,8 +125,8 @@ export function SteamProvider({ children }) {
     } catch {}
   };
 
-  const wishlistSet = new Set(data?.wishlistAppIds || []);
-  const librarySet = new Set(data?.libraryAppIds || []);
+  const wishlistSet = new Set((data?.wishlistGames || []).map((g) => g.appid));
+  const librarySet = new Set((data?.libraryGames || []).map((g) => g.appid));
 
   return (
     <SteamContext.Provider
@@ -106,7 +136,10 @@ export function SteamProvider({ children }) {
         disconnect,
         status,
         error,
+        steamid: data?.steamid || profile?.steamid || null,
         libraryPublic: data?.libraryPublic ?? null,
+        libraryGames: data?.libraryGames || [],
+        wishlistGames: data?.wishlistGames || [],
         isWishlisted: (appId) => appId != null && wishlistSet.has(appId),
         isOwned: (appId) => appId != null && librarySet.has(appId),
       }}
