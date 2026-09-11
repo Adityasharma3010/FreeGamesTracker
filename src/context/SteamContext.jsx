@@ -87,13 +87,17 @@ export function SteamProvider({ children }) {
       })
       .catch((err) => {
         if (cancelled) return;
-        if (import.meta.env.DEV) {
-          setData(MOCK_DATA);
-          setStatus("success");
-        } else {
-          setError(err.message);
-          setStatus("error");
-        }
+        // IMPORTANT: this used to silently fall back to mock data
+        // whenever import.meta.env.DEV was true — but that's ALSO true
+        // under `vercel dev`, not just plain `npm run dev` (vercel dev
+        // still runs Vite's own dev server underneath). That meant a
+        // REAL failure — wrong API key, Steam rate limit, a private
+        // profile, anything — got silently masked as "success" with
+        // fake CS2/Dota2 data, with no way to tell something was
+        // actually broken. Always surface the real error now; mock
+        // data is opt-in only, via useMockData() below.
+        setError(err.message);
+        setStatus("error");
       });
 
     return () => {
@@ -125,6 +129,17 @@ export function SteamProvider({ children }) {
     } catch {}
   };
 
+  // Dev-only, explicit opt-in — never triggered automatically. Lets you
+  // preview the UI's look with fake data when you know the real API
+  // genuinely isn't reachable (e.g. testing under plain `npm run dev`,
+  // which can't execute /api at all), without that ever masking a real
+  // bug the way the old automatic fallback did.
+  const useMockData = () => {
+    setData(MOCK_DATA);
+    setStatus("success");
+    setError(null);
+  };
+
   const wishlistSet = new Set((data?.wishlistGames || []).map((g) => g.appid));
   const librarySet = new Set((data?.libraryGames || []).map((g) => g.appid));
 
@@ -134,6 +149,7 @@ export function SteamProvider({ children }) {
         connected: !!profile,
         connect,
         disconnect,
+        useMockData,
         status,
         error,
         steamid: data?.steamid || profile?.steamid || null,
