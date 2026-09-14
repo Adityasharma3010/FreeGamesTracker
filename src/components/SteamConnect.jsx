@@ -194,7 +194,7 @@ export default function SteamConnect() {
                   </h2>
                   <button
                     onClick={() => setOpen(false)}
-                    className="transition-transform duration-150 hover:scale-125 hover:rotate-90"
+                    className="transition-transform duration-150 hover:scale-125 hover:rotate-90 cursor-pointer"
                     style={{ color: theme.textFaint }}
                     aria-label="Close"
                   >
