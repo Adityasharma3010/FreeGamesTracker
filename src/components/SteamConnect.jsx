@@ -10,11 +10,19 @@ import { LuX } from "react-icons/lu";
 function GameTile({ appid, name, theme, highlight, index }) {
   const [imgOk, setImgOk] = useState(true);
   const [hover, setHover] = useState(false);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
   // Steam's real box art, straight from their public CDN — no extra API
   // call needed, works for virtually any App ID. Much better than the
   // tiny 32x32 icon GetOwnedGames/wishlistdata hand back by default.
   const headerImg = `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/header.jpg`;
   const glow = highlight ? "#fbbf24" : "#2fb4ff";
+
+  const handleMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width - 0.5;
+    const py = (e.clientY - rect.top) / rect.height - 0.5;
+    setTilt({ x: py * -8, y: px * 8 });
+  };
 
   return (
     <a
@@ -22,14 +30,19 @@ function GameTile({ appid, name, theme, highlight, index }) {
       target="_blank"
       rel="noopener noreferrer"
       onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      onMouseMove={handleMove}
+      onMouseLeave={() => {
+        setHover(false);
+        setTilt({ x: 0, y: 0 });
+      }}
       style={{
         animationDelay: `${Math.min(index, 20) * 40}ms`,
         background: theme.surface,
         borderColor: highlight ? "#fbbf24" : hover ? glow : theme.surfaceBorder,
         boxShadow: hover ? `0 0 16px ${glow}77, 0 8px 20px -8px ${glow}55` : highlight ? "0 0 10px #fbbf2444" : "none",
+        transform: `perspective(500px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) ${hover ? "translateY(-4px)" : ""}`,
       }}
-      className="group motion-safe:opacity-0 motion-safe:animate-card-in flex flex-col overflow-hidden border transition-all duration-200 hover:-translate-y-1 active:scale-[0.97]"
+      className="group motion-safe:opacity-0 motion-safe:animate-card-in flex flex-col overflow-hidden border transition-[border-color,box-shadow] duration-200 active:scale-[0.97] will-change-transform"
     >
       <div className="relative w-full aspect-[460/215] overflow-hidden" style={{ background: theme.chipBg }}>
         {imgOk ? (
@@ -107,21 +120,31 @@ export default function SteamConnect() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="tap-target relative flex items-center gap-1.5 px-3 py-1.5 rounded-full border-2 text-xs font-bold transition-all duration-200 hover:scale-105 active:scale-95 shrink-0"
+        className="tap-target relative flex items-center gap-1.5 px-3 py-1.5 rounded-full border-2 cursor-pointer text-xs font-bold transition-all duration-200 hover:scale-105 active:scale-95 shrink-0"
         style={
           connected
-            ? { borderColor: "#2fb4ff", color: "#2fb4ff", background: "#2fb4ff1a", boxShadow: "0 0 12px #2fb4ff55" }
+            ? { borderColor: "#2fb4ff", color: "#2fb4ff", background: "#2fb4ff1a", animation: "steamBreathe 2.4s ease-in-out infinite" }
             : { borderColor: theme.chipBorder, color: theme.chipText, background: theme.chipBg }
         }
       >
+        <style>{`
+          @keyframes steamBreathe { 0%,100% { box-shadow: 0 0 10px #2fb4ff44 } 50% { box-shadow: 0 0 18px #2fb4ffaa } }
+          @keyframes radarPing { 0% { transform: scale(1); opacity: 0.7 } 100% { transform: scale(2.2); opacity: 0 } }
+        `}</style>
         <SiSteam size={13} />
         <span className="hidden sm:inline">{connected ? "Steam connected" : "Connect Steam"}</span>
         {matches.length > 0 && (
-          <span
-            className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center text-[10px] font-black motion-safe:animate-pulse-dot"
-            style={{ background: "#fbbf24", color: "#151517" }}
-          >
-            {matches.length}
+          <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center">
+            <span
+              className="absolute inset-0 rounded-full motion-safe:[animation:radarPing_1.6s_ease-out_infinite]"
+              style={{ background: "#fbbf24" }}
+            />
+            <span
+              className="relative min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center text-[10px] font-black"
+              style={{ background: "#fbbf24", color: "#151517" }}
+            >
+              {matches.length}
+            </span>
           </span>
         )}
       </button>
@@ -140,17 +163,25 @@ export default function SteamConnect() {
             <style>{`
               @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
               @keyframes modalIn { from { opacity: 0; transform: scale(0.96) translateY(8px) } to { opacity: 1; transform: scale(1) translateY(0) } }
+              @keyframes borderSpin { to { transform: rotate(360deg) } }
+              @keyframes shimmerSweep { 0% { transform: translateX(-100%) } 100% { transform: translateX(250%) } }
             `}</style>
+            {/* Rotating conic-gradient ring behind the panel — the 2px
+                padding on this wrapper is what lets it peek through as
+                an animated border, instead of a static one. */}
             <div
+              className="relative w-full max-w-lg max-h-[85vh] p-[2px] motion-safe:opacity-0 motion-safe:animate-[modalIn_.25s_ease-out_forwards]"
+              style={{ clipPath: "polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px)", boxShadow: "0 25px 60px -15px rgba(0,0,0,0.6)" }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-lg max-h-[85vh] flex flex-col border-2 backdrop-blur-xl motion-safe:opacity-0 motion-safe:animate-[modalIn_.25s_ease-out_forwards]"
-              style={{
-                background: theme.panelBg,
-                borderColor: theme.panelBorder,
-                clipPath: "polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px)",
-                boxShadow: "0 0 0 1.5px #2fb4ff55, 0 25px 60px -15px rgba(0,0,0,0.6)",
-              }}
             >
+              <div
+                className="absolute -inset-[40%] motion-safe:[animation:borderSpin_6s_linear_infinite]"
+                style={{ background: "conic-gradient(from 0deg, #2fb4ff, #a855f7, #fbbf24, #2fb4ff)" }}
+              />
+              <div
+                className="relative w-full h-full max-h-[calc(85vh-4px)] flex flex-col overflow-hidden backdrop-blur-xl"
+                style={{ background: theme.panelBg, clipPath: "polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px)" }}
+              >
               <div className="relative overflow-hidden">
                 <div
                   className="absolute inset-x-0 top-0 h-16 opacity-[0.08] pointer-events-none motion-safe:animate-scan"
@@ -158,7 +189,7 @@ export default function SteamConnect() {
                 />
                 <div className="relative flex items-center justify-between p-5 pb-3 shrink-0">
                   <h2 className="text-sm font-black uppercase tracking-wide flex items-center gap-2" style={{ color: theme.text }}>
-                    <SiSteam size={16} className={status === "loading" ? "motion-safe:animate-spin" : ""} />
+                    <SiSteam size={16} />
                     Connect Steam
                   </h2>
                   <button
@@ -170,6 +201,14 @@ export default function SteamConnect() {
                     <LuX size={18} />
                   </button>
                 </div>
+                {status === "loading" && (
+                  <div className="relative h-[2px] w-full overflow-hidden" style={{ background: theme.chipBg }}>
+                    <div
+                      className="absolute inset-y-0 w-1/3 motion-safe:[animation:shimmerSweep_1.2s_ease-in-out_infinite]"
+                      style={{ background: "linear-gradient(90deg, transparent, #2fb4ff, transparent)" }}
+                    />
+                  </div>
+                )}
               </div>
 
               {connected ? (
@@ -211,17 +250,23 @@ export default function SteamConnect() {
                         </p>
                       )}
 
-                      <div className="flex gap-1 px-5 pb-3 shrink-0 overflow-x-auto">
+                      <div className="relative grid grid-cols-3 gap-1 mx-5 mb-3 p-1 rounded-sm shrink-0" style={{ background: theme.chipBg }}>
+                        <div
+                          className="absolute top-1 bottom-1 rounded-sm transition-transform duration-300 ease-out"
+                          style={{
+                            left: 4,
+                            width: "calc((100% - 12px) / 3)",
+                            transform: `translateX(${TABS.findIndex((t) => t.key === tab) * 100}%)`,
+                            background: "#2fb4ff",
+                            boxShadow: "0 0 10px #2fb4ff77",
+                          }}
+                        />
                         {TABS.map((t) => (
                           <button
                             key={t.key}
                             onClick={() => setTab(t.key)}
-                            className="text-[11px] font-black uppercase tracking-wide px-2.5 py-1.5 rounded-sm whitespace-nowrap transition-all duration-200 hover:scale-105 active:scale-95"
-                            style={
-                              tab === t.key
-                                ? { background: "#2fb4ff", color: "#051622", boxShadow: "0 0 10px #2fb4ff77" }
-                                : { background: theme.chipBg, color: theme.chipText }
-                            }
+                            className="relative z-10 text-[11px] font-black uppercase tracking-wide px-2 py-1.5 rounded-sm whitespace-nowrap transition-colors duration-200"
+                            style={{ color: tab === t.key ? "#051622" : theme.chipText }}
                           >
                             {t.label}
                           </button>
@@ -310,7 +355,7 @@ export default function SteamConnect() {
                         disconnect();
                         setOpen(false);
                       }}
-                      className="tap-target w-full text-[12px] font-bold px-3 py-2 rounded-sm border-2 transition-all duration-200 hover:scale-[1.02]"
+                      className="tap-target w-full text-[12px] font-bold px-3 py-2 rounded-sm border-2 transition-all duration-200 hover:scale-[1.02] cursor-pointer"
                       style={{ borderColor: theme.chipBorder, color: theme.chipText, background: theme.chipBg }}
                     >
                       Disconnect
@@ -326,8 +371,9 @@ export default function SteamConnect() {
                   <a
                     href="/api/auth/steam-login"
                     className="tap-target relative flex items-center justify-center gap-2 text-[13px] font-black px-3 py-3 rounded-sm uppercase tracking-wide overflow-hidden group/btn transition-transform duration-150 hover:scale-[1.02] active:scale-95"
-                    style={{ background: "#2fb4ff", color: "#051622", boxShadow: "0 4px 18px -4px #2fb4ffaa" }}
+                    style={{ background: "#2fb4ff", color: "#051622", animation: "steamGlow 2.2s ease-in-out infinite" }}
                   >
+                    <style>{`@keyframes steamGlow { 0%,100% { box-shadow: 0 4px 18px -4px #2fb4ff88 } 50% { box-shadow: 0 4px 26px -2px #2fb4ffdd } }`}</style>
                     <SiSteam size={16} className="relative z-10" />
                     <span className="relative z-10">Sign in through Steam</span>
                     <span className="absolute inset-0 -translate-x-full group-hover/btn:translate-x-full transition-transform duration-700 bg-[linear-gradient(110deg,transparent,rgba(255,255,255,0.5),transparent)]" />
@@ -374,6 +420,7 @@ export default function SteamConnect() {
                   )}
                 </div>
               )}
+              </div>
             </div>
           </div>,
           document.body
