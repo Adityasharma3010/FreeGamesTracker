@@ -9,7 +9,7 @@ export default function Nav() {
   return (
     <nav className="relative z-20 backdrop-blur-xl border-b-2 theme-transition" style={{ background: theme.navBg, borderColor: theme.navBorder }}>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 cursor-pointer">
           <div
             className="w-9 h-9 flex items-center justify-center shrink-0"
             style={{ background: "linear-gradient(135deg,#a855f7,#ec4899)", clipPath: "polygon(0 8px,8px 0,100% 0,100% 100%,0 100%)", boxShadow: "0 0 18px rgba(217,70,239,0.6)" }}
@@ -27,7 +27,7 @@ export default function Nav() {
             <button
               onClick={() => setDark(false)}
               aria-label="Light mode"
-              className="tap-target px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-200 flex items-center gap-1"
+              className="tap-target px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-200 flex items-center gap-1 cursor-pointer"
               style={!dark ? { background: "#fbbf24", color: "#111", boxShadow: "0 0 12px #fbbf2488" } : { color: theme.toggleInactive }}
             >
               <LuSun size={14} /><span className="hidden xs:inline">Light</span>
@@ -35,7 +35,7 @@ export default function Nav() {
             <button
               onClick={() => setDark(true)}
               aria-label="Dark mode"
-              className="tap-target px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-200 flex items-center gap-1"
+              className="tap-target px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-200 flex items-center gap-1 cursor-pointer"
               style={dark ? { background: "#7c3aed", color: "#fff", boxShadow: "0 0 12px #7c3aed88" } : { color: theme.toggleInactive }}
             >
               <LuMoon size={14} /><span className="hidden xs:inline">Dark</span>
