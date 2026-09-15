@@ -90,7 +90,7 @@ function TileSkeleton({ index }) {
 
 export default function SteamConnect() {
   const { theme } = useTheme();
-  const { connected, connect, disconnect, useMockData, status, error, isWishlisted, wishlistGames, libraryGames, libraryPublic, steamid } = useSteam();
+  const { connected, connect, disconnect, useMockData, status, error, isWishlisted, wishlistGames, libraryGames, libraryPublic, steamid, playerProfile } = useSteam();
   const { giveaways } = useGiveaways();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("matches"); // matches | wishlist | library
@@ -163,38 +163,85 @@ export default function SteamConnect() {
             <style>{`
               @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
               @keyframes modalIn { from { opacity: 0; transform: scale(0.96) translateY(8px) } to { opacity: 1; transform: scale(1) translateY(0) } }
-              @keyframes borderSpin { to { transform: rotate(360deg) } }
+              @keyframes glowCycle {
+                0%   { box-shadow: 0 0 22px 2px #2fb4ffaa, 0 25px 60px -15px rgba(0,0,0,0.6) }
+                33%  { box-shadow: 0 0 22px 2px #a855f7aa, 0 25px 60px -15px rgba(0,0,0,0.6) }
+                66%  { box-shadow: 0 0 22px 2px #fbbf24aa, 0 25px 60px -15px rgba(0,0,0,0.6) }
+                100% { box-shadow: 0 0 22px 2px #2fb4ffaa, 0 25px 60px -15px rgba(0,0,0,0.6) }
+              }
               @keyframes shimmerSweep { 0% { transform: translateX(-100%) } 100% { transform: translateX(250%) } }
             `}</style>
-            {/* Rotating conic-gradient ring behind the panel — the 2px
-                padding on this wrapper is what lets it peek through as
-                an animated border, instead of a static one. */}
+            {/* Single panel, single clip-path, applied once. The two
+                rotating-gradient structures we tried both broke
+                specifically once the Library tab had real, ~294-item
+                content — a rendering issue that only showed up with
+                genuinely large scrollable content, which I couldn't
+                reproduce or verify without live browser access. This
+                version has no second animated layer and no rotation at
+                all, so that whole category of bug is structurally
+                impossible here: box-shadow always respects its own
+                element's clip-path, full stop, regardless of how much
+                content is scrolling inside it. */}
             <div
-              className="relative w-full max-w-lg max-h-[85vh] p-[2px] motion-safe:opacity-0 motion-safe:animate-[modalIn_.25s_ease-out_forwards]"
-              style={{ clipPath: "polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px)", boxShadow: "0 25px 60px -15px rgba(0,0,0,0.6)" }}
               onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden motion-safe:opacity-0"
+              style={{
+                background: theme.panelBg,
+                clipPath: "polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px)",
+                animation: "modalIn .25s ease-out forwards, glowCycle 4.5s ease-in-out infinite",
+              }}
             >
-              <div
-                className="absolute -inset-[40%] motion-safe:[animation:borderSpin_6s_linear_infinite]"
-                style={{ background: "conic-gradient(from 0deg, #2fb4ff, #a855f7, #fbbf24, #2fb4ff)" }}
-              />
-              <div
-                className="relative w-full h-full max-h-[calc(85vh-4px)] flex flex-col overflow-hidden backdrop-blur-xl"
-                style={{ background: theme.panelBg, clipPath: "polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px)" }}
-              >
               <div className="relative overflow-hidden">
                 <div
                   className="absolute inset-x-0 top-0 h-16 opacity-[0.08] pointer-events-none motion-safe:animate-scan"
                   style={{ background: "linear-gradient(180deg, transparent, #2fb4ff, transparent)" }}
                 />
                 <div className="relative flex items-center justify-between p-5 pb-3 shrink-0">
-                  <h2 className="text-sm font-black uppercase tracking-wide flex items-center gap-2" style={{ color: theme.text }}>
-                    <SiSteam size={16} />
-                    Connect Steam
-                  </h2>
+                  {connected && playerProfile ? (
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {playerProfile.avatar ? (
+                        <img
+                          src={playerProfile.avatar}
+                          alt=""
+                          className="w-8 h-8 rounded-sm shrink-0 border"
+                          style={{ borderColor: "#2fb4ff77" }}
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-sm shrink-0 flex items-center justify-center" style={{ background: theme.chipBg }}>
+                          <SiSteam size={16} style={{ color: theme.textFaint }} />
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <h2 className="text-sm font-black leading-tight truncate" style={{ color: theme.text }}>
+                          {playerProfile.personaname || "Connect Steam"}
+                        </h2>
+                        <span
+                          className="text-[9.5px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded inline-block mt-0.5"
+                          style={
+                            playerProfile.visibility === "public"
+                              ? { background: "#4bdc3d22", color: "#4bdc3d" }
+                              : { background: "#fbbf2422", color: "#fbbf24" }
+                          }
+                        >
+                          {playerProfile.visibility === "public"
+                            ? "Public profile"
+                            : playerProfile.visibility === "friendsonly"
+                            ? "Friends-only profile"
+                            : playerProfile.visibility === "private"
+                            ? "Private profile"
+                            : "Visibility unknown"}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <h2 className="text-sm font-black uppercase tracking-wide flex items-center gap-2" style={{ color: theme.text }}>
+                      <SiSteam size={16} />
+                      Connect Steam
+                    </h2>
+                  )}
                   <button
                     onClick={() => setOpen(false)}
-                    className="transition-transform duration-150 hover:scale-125 hover:rotate-90 cursor-pointer"
+                    className="transition-transform duration-150 hover:scale-125 hover:rotate-90 shrink-0 cursor-pointer"
                     style={{ color: theme.textFaint }}
                     aria-label="Close"
                   >
@@ -313,7 +360,9 @@ export default function SteamConnect() {
                           <div className="grid grid-cols-2 gap-2">
                             {wishlistGames.length === 0 && (
                               <p className="text-[12px] col-span-2" style={{ color: theme.textDim }}>
-                                Your wishlist is empty, or set to private.
+                                {playerProfile && playerProfile.visibility !== "public"
+                                  ? `Your Steam profile is set to ${playerProfile.visibility === "private" ? "private" : "friends-only"} — wishlist and library can't be read until it's public.`
+                                  : "Your wishlist is empty."}
                               </p>
                             )}
                             {wishlistGames.map((g, i) => (
@@ -420,7 +469,6 @@ export default function SteamConnect() {
                   )}
                 </div>
               )}
-              </div>
             </div>
           </div>,
           document.body
