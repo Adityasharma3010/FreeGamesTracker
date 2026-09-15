@@ -9,6 +9,12 @@ const SteamContext = createContext(null);
 // test this UI locally without deploying first.
 const MOCK_DATA = {
   steamid: "MOCK",
+  profile: {
+    personaname: "Sample Player",
+    avatar: null,
+    profileUrl: "https://steamcommunity.com",
+    visibility: "public",
+  },
   libraryPublic: true,
   libraryGames: [
     { appid: 730, name: "Counter-Strike 2", icon: null },
@@ -153,6 +159,7 @@ export function SteamProvider({ children }) {
         status,
         error,
         steamid: data?.steamid || profile?.steamid || null,
+        playerProfile: data?.profile || null,
         libraryPublic: data?.libraryPublic ?? null,
         libraryGames: data?.libraryGames || [],
         wishlistGames: data?.wishlistGames || [],
