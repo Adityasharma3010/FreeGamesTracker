@@ -22,6 +22,29 @@ async function resolveVanityUrl(vanity) {
   return null;
 }
 
+// GetPlayerSummaries — official, documented Steam Web API. Gives us the
+// real display name, avatar, and (critically) `communityvisibilitystate`,
+// which tells us whether the profile itself is public/friends/private —
+// distinct from, and more reliable than, inferring visibility indirectly
+// from whether GetOwnedGames happened to return an empty games array.
+async function fetchProfile(steamid) {
+  const url = `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${STEAM_API_KEY}&steamids=${steamid}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  const data = await res.json();
+  const p = data?.response?.players?.[0];
+  if (!p) return null;
+
+  // 1 = Private, 2 = Friends Only, 3 = Public (Valve's own enum values)
+  const visibility = { 1: "private", 2: "friendsonly", 3: "public" }[p.communityvisibilitystate] || "unknown";
+
+  return {
+    personaname: p.personaname || null,
+    avatar: p.avatarfull || p.avatarmedium || p.avatar || null,
+    profileUrl: p.profileurl || `https://steamcommunity.com/profiles/${steamid}`,
+    visibility,
+  };
+}
+
 async function fetchLibrary(steamid) {
   const url = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${STEAM_API_KEY}&steamid=${steamid}&include_appinfo=1&include_played_free_games=1&format=json`;
   const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
@@ -113,7 +136,8 @@ export default async function handler(req, res) {
       }
     }
 
-    const [library, wishlistGames] = await Promise.all([
+    const [profile, library, wishlistGames] = await Promise.all([
+      fetchProfile(id).catch(() => null), // profile failing shouldn't sink the rest
       fetchLibrary(id),
       fetchWishlist(id).catch(() => []), // wishlist failing shouldn't sink library data
     ]);
@@ -124,6 +148,7 @@ export default async function handler(req, res) {
     );
     res.status(200).json({
       steamid: id,
+      profile,
       libraryPublic: library.public,
       libraryGames: library.games,
       wishlistGames,
