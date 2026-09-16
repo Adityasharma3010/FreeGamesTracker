@@ -230,7 +230,7 @@ export default function SteamConnect() {
               onClick={(e) => e.stopPropagation()}
             >
               <div
-                className={`absolute ${tab === "library" || tab === "wishlist" ? "-inset-[50%]" : "-inset-[75%]"} motion-safe:[animation:borderSpin_6s_linear_infinite]`}
+                className={`absolute ${(connected && tab === "library") || (connected && tab === "wishlist") ? "-inset-[50%]" : "-inset-[75%]"} motion-safe:[animation:borderSpin_6s_linear_infinite]`}
                 style={{
                   background:
                     "conic-gradient(from 0deg, #2fb4ff, #a855f7, #fbbf24, #2fb4ff)",
