@@ -69,13 +69,132 @@ async function fetchLibrary(steamid) {
   };
 }
 
+// Steam's newer wishlist endpoint (see fetchWishlist below) only returns
+// App IDs + priority, no names. GetAppList returns a name for every
+// game on Steam in ONE request — better than calling the Store's
+// appdetails endpoint once per wishlist item, which has fairly strict
+// rate limits (historically ~200 requests/5min) and would mean 100+
+// calls for a large wishlist, easily blowing past a serverless
+// function's execution timeout.
+//
+// SteamDB doesn't re-fetch this live per request at all — it runs its
+// own persistent, continuously-updated database. We don't have a
+// database here, so we can't replicate that exactly, but this gets a
+// real chunk of the same benefit cheaply: the list is cached in this
+// module's memory, which Vercel keeps alive across requests as long as
+// the underlying function instance stays "warm" (common for
+// back-to-back requests; resets on a cold start). That means only the
+// occasional request pays the cost of the ~100k-entry fetch — every
+// other request, including from completely different users with
+// different wishlists, reuses the same cached list instantly instead of
+// re-fetching it. Not as durable as a real database-backed cache would
+// be, but a meaningful step up from "no caching at all" without needing
+// any new infrastructure (Vercel KV, a real DB, etc).
+let appListCache = null; // { fetchedAt, map: Map<appid, name> }
+const APP_LIST_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+let lastAppListDebug = "not-attempted-yet";
+
+async function fetchAppNames(appids) {
+  const fresh = appListCache && Date.now() - appListCache.fetchedAt < APP_LIST_TTL_MS;
+  if (!fresh) {
+    try {
+      // ISteamApps/GetAppList/v2 (used previously) is officially
+      // deprecated by Valve — confirmed by hitting it directly and
+      // getting a 404 "Method 'GetAppList' not found in interface
+      // 'ISteamApps'". Valve's own docs point to IStoreService/GetAppList
+      // as the replacement. It needs the API key (which we already have)
+      // and returns results in pages rather than all at once, so this
+      // loops through pages using the cursor Valve returns
+      // (last_appid/have_more_results) until there's nothing more left,
+      // capped defensively so a malformed response can't loop forever.
+      const map = new Map();
+      let lastAppid = 0;
+      let pages = 0;
+      let ok = true;
+      while (pages < 6) {
+        const url = `https://api.steampowered.com/IStoreService/GetAppList/v1/?key=${STEAM_API_KEY}&max_results=50000&last_appid=${lastAppid}`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+        if (!res.ok) {
+          ok = false;
+          lastAppListDebug = `http-${res.status}`;
+          break;
+        }
+        const data = await res.json();
+        const apps = data?.response?.apps;
+        if (!Array.isArray(apps) || apps.length === 0) break;
+        for (const a of apps) map.set(a.appid, a.name);
+        pages++;
+        if (!data.response.have_more_results) break;
+        lastAppid = data.response.last_appid;
+      }
+      if (ok && map.size > 0) {
+        appListCache = { fetchedAt: Date.now(), map };
+        lastAppListDebug = `fresh-fetch-ok-${map.size}-apps-${pages}-pages`;
+      } else if (ok) {
+        lastAppListDebug = "unexpected-shape";
+      }
+    } catch (err) {
+      lastAppListDebug = `error-${err?.name || "unknown"}`;
+      /* if this fails and we have no cache at all, fall through below
+         and just return an empty map — names fall back to "App <id>" */
+    }
+  } else {
+    lastAppListDebug = "cache-hit";
+  }
+  if (!appListCache) return new Map();
+  const wanted = new Set(appids);
+  const result = new Map();
+  for (const id of wanted) {
+    if (appListCache.map.has(id)) result.set(id, appListCache.map.get(id));
+  }
+  return result;
+}
+
 async function fetchWishlist(steamid) {
+  // Valve's newer, more reliable wishlist endpoint. The old
+  // store.steampowered.com/wishlist/.../wishlistdata/ JSON endpoint
+  // (still used as a fallback below) has become unreliable/broken for
+  // many accounts — this was the actual cause of wishlists showing
+  // empty even on fully public profiles. This endpoint returns App IDs
+  // and priority, but NOT names or images the way the old one did —
+  // GameTile already pulls real box art from Steam's CDN by App ID
+  // regardless, so visuals are unaffected; only the text label falls
+  // back to "App <id>" until a proper name lookup is added.
+  try {
+    const url = `https://api.steampowered.com/IWishlistService/GetWishlist/v1/?key=${STEAM_API_KEY}&steamid=${steamid}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (res.ok) {
+      const data = await res.json();
+      const items = data?.response?.items;
+      if (Array.isArray(items) && items.length > 0) {
+        const nameMap = await fetchAppNames(items.map((it) => it.appid));
+        return {
+          source: "official",
+          games: items
+            .map((it) => ({
+              appid: it.appid,
+              name: nameMap.get(it.appid) || `App ${it.appid}`,
+              icon: null,
+              priority: typeof it.priority === "number" ? it.priority : 9999,
+            }))
+            .sort((a, b) => a.priority - b.priority),
+        };
+      }
+      // Request succeeded but genuinely had 0 items, or an unexpected
+      // shape — either way, fall through and try the legacy endpoint
+      // too rather than assume "0 items" is definitely correct.
+    }
+  } catch {
+    /* fall through to the legacy endpoint below */
+  }
+
+  // Legacy fallback — kept in case the new endpoint ever fails for a
+  // given account. When it works, it conveniently includes real names
+  // and images, which the new endpoint doesn't provide.
   const games = [];
   let page = 0;
-  // Paginated, ~1000 items/page historically — cap pages defensively
-  // so a malformed response can't loop forever.
   for (let i = 0; i < 15; i++) {
-    const url = `https://store.steampowered.com/wishlist/profiles/${steamid}/wishlistdata/?p=${page}`;
+    const url = `https://store.steampowered.com/wishlist/profiles/${steamid}/wishlistdata/?p=${page}&v=23`;
     const res = await fetch(url, {
       headers: {
         "User-Agent":
@@ -99,7 +218,7 @@ async function fetchWishlist(steamid) {
     page++;
     if (entries.length < 1000) break; // last page
   }
-  return games.sort((a, b) => a.priority - b.priority);
+  return { source: games.length > 0 ? "legacy" : "both-empty", games: games.sort((a, b) => a.priority - b.priority) };
 }
 
 export default async function handler(req, res) {
@@ -136,10 +255,10 @@ export default async function handler(req, res) {
       }
     }
 
-    const [profile, library, wishlistGames] = await Promise.all([
+    const [profile, library, wishlist] = await Promise.all([
       fetchProfile(id).catch(() => null), // profile failing shouldn't sink the rest
       fetchLibrary(id),
-      fetchWishlist(id).catch(() => []), // wishlist failing shouldn't sink library data
+      fetchWishlist(id).catch(() => ({ source: "error", games: [] })), // wishlist failing shouldn't sink library data
     ]);
 
     res.setHeader(
@@ -151,7 +270,9 @@ export default async function handler(req, res) {
       profile,
       libraryPublic: library.public,
       libraryGames: library.games,
-      wishlistGames,
+      wishlistGames: wishlist.games,
+      wishlistSource: wishlist.source, // "official" | "legacy" | "both-empty" | "error" — debug field, see README
+      appListDebug: lastAppListDebug, // debug field — remove once name lookup is confirmed working
     });
   } catch (err) {
     res
