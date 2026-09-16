@@ -237,9 +237,10 @@ export default function SteamConnect() {
                 }}
               />
               <div
-                className="relative w-full h-full max-h-[calc(85vh-4px)] flex flex-col overflow-hidden backdrop-blur-xl"
+                className="relative w-full h-full max-h-[calc(85vh-4px)] flex flex-col overflow-hidden backdrop-blur-xl transition-colors duration-500 ease-in-out"
                 style={{
-                  background: theme.panelBg,
+                  background:
+                    status === "success" ? theme.loadedPanelBg : theme.panelBg,
                   clipPath:
                     "polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px)",
                 }}
