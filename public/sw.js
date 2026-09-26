@@ -31,6 +31,12 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
 
+  // Only handle normal web requests. Browser extensions make requests
+  // with schemes like chrome-extension:// that the Cache API refuses to
+  // store (that was the "Request scheme 'chrome-extension' is
+  // unsupported" console error), and non-GET requests can't be cached.
+  if (!url.protocol.startsWith("http") || e.request.method !== "GET") return;
+
   // Never intercept giveaway data or our own API — always live network,
   // never cached, never stale.
   if (url.hostname.includes("gamerpower.com") || url.pathname.startsWith("/api/")) return;

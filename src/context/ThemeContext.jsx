@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 
 const STORAGE_KEY = "fgt-theme";
 
-const ThemeContext = createContext(null);
+export const ThemeContext = createContext(null);
 
 // Same approach as the mockup: theme colors come from a JS object driven
 // by state, not from Tailwind's `dark:` variant. This is deliberate —
@@ -10,7 +10,7 @@ const ThemeContext = createContext(null);
 // of quietly depending on a CSS strategy that can be misconfigured.
 // Tailwind's `dark:` classes are still used for the FEW things that are
 // pure layout/spacing (no color), where it's harmless.
-function buildTheme(dark) {
+export function buildTheme(dark) {
   return dark
     ? {
         dark: true,
@@ -27,6 +27,7 @@ function buildTheme(dark) {
         surface: "rgba(255,255,255,0.05)",
         surfaceBorder: "rgba(255,255,255,0.12)",
         panelBg: "rgba(12,13,20,0.92)",
+        loadedPanelBg: "#0c0d14",
         panelBorder: "rgba(255,255,255,0.12)",
         chipBg: "rgba(255,255,255,0.04)",
         chipBorder: "rgba(255,255,255,0.15)",
@@ -50,6 +51,7 @@ function buildTheme(dark) {
         surface: "#ffffff",
         surfaceBorder: "rgba(0,0,0,0.1)",
         panelBg: "rgba(255,255,255,0.95)",
+        loadedPanelBg: "#fffffff2",
         panelBorder: "rgba(0,0,0,0.1)",
         chipBg: "#ffffff",
         chipBorder: "rgba(0,0,0,0.15)",
@@ -88,7 +90,9 @@ export function ThemeProvider({ children }) {
     theme: buildTheme(dark),
   };
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+  );
 }
 
 export function useTheme() {

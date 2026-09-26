@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/steam", "destination": "/index.html" },
+    { "source": "/steam/:path*", "destination": "/index.html" }
+  ]
+}

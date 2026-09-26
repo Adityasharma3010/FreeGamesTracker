@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { useTheme } from "./context/ThemeContext.jsx";
 import { useGiveaways } from "./hooks/useGiveaways.js";
 import { matchesPlatform, typeKeyFor } from "./lib/platforms.js";
@@ -10,6 +11,16 @@ import WatchView from "./components/WatchView.jsx";
 import AmbientBackground from "./components/AmbientBackground.jsx";
 import TrialNewsBadge from "./components/TrialNewsBadge.jsx";
 import FavoritesBadge from "./components/FavoritesBadge.jsx";
+import SteamLayout from "./pages/steam/SteamLayout.jsx";
+import SteamProfilePage from "./pages/steam/SteamProfilePage.jsx";
+import SteamGamesPage from "./pages/steam/SteamGamesPage.jsx";
+import SteamMatchesPage from "./pages/steam/SteamMatchesPage.jsx";
+import SteamGamePage from "./pages/steam/SteamGamePage.jsx";
+import FriendLayout from "./pages/steam/FriendLayout.jsx";
+import FriendProfilePage from "./pages/steam/FriendProfilePage.jsx";
+import FriendGamesPage from "./pages/steam/FriendGamesPage.jsx";
+import FriendMatchesPage from "./pages/steam/FriendMatchesPage.jsx";
+import FriendGamePage from "./pages/steam/FriendGamePage.jsx";
 
 function endTimestamp(g) {
   if (!g.end_date || g.end_date === "N/A") return Infinity; // no end date sorts last
@@ -17,7 +28,7 @@ function endTimestamp(g) {
   return isNaN(t) ? Infinity : t;
 }
 
-export default function App() {
+function HomePage() {
   const { theme } = useTheme();
   const { giveaways, status, error, refresh } = useGiveaways();
 
@@ -120,5 +131,28 @@ export default function App() {
         />
       </div>
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<HomePage />} />
+      <Route path="/steam" element={<SteamLayout />}>
+        <Route index element={<SteamProfilePage />} />
+        <Route path="wishlist" element={<SteamGamesPage kind="wishlist" />} />
+        <Route path="library" element={<SteamGamesPage kind="library" />} />
+        <Route path="matches" element={<SteamMatchesPage />} />
+        <Route path="game/:appid" element={<SteamGamePage />} />
+      </Route>
+      <Route path="/steam/friend/:steamid" element={<FriendLayout />}>
+        <Route index element={<FriendProfilePage />} />
+        <Route path="wishlist" element={<FriendGamesPage kind="wishlist" />} />
+        <Route path="library" element={<FriendGamesPage kind="library" />} />
+        <Route path="matches" element={<FriendMatchesPage />} />
+        <Route path="game/:appid" element={<FriendGamePage />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }

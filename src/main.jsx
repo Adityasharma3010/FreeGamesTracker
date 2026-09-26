@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
 import App from "./App.jsx";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { FavoritesProvider } from "./context/FavoritesContext.jsx";
@@ -11,9 +12,13 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <ThemeProvider>
       <FavoritesProvider>
         <SteamProvider>
-          <App />
+          <BrowserRouter
+            future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          >
+            <App />
+          </BrowserRouter>
         </SteamProvider>
       </FavoritesProvider>
     </ThemeProvider>
-  </React.StrictMode>
+  </React.StrictMode>,
 );

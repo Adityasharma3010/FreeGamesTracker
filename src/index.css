@@ -83,6 +83,34 @@
     background-position: 60px 60px;
   }
 }
+@keyframes shimmerSweep {
+  0% {
+    background-position: 150% 0;
+  }
+  100% {
+    background-position: -150% 0;
+  }
+}
+/* Game-image loading skeleton: a soft highlight band sweeping left to
+   right, rather than a flat pulsing fade. */
+.img-shimmer {
+  background-color: rgba(255, 255, 255, 0.06);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.06) 0%,
+    rgba(255, 255, 255, 0.06) 35%,
+    rgba(255, 255, 255, 0.16) 50%,
+    rgba(255, 255, 255, 0.06) 65%,
+    rgba(255, 255, 255, 0.06) 100%
+  );
+  background-size: 250% 100%;
+  animation: shimmerSweep 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .img-shimmer {
+    animation: none;
+  }
+}
 
 html,
 body,
