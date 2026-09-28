@@ -252,6 +252,247 @@ async function fetchDlc(dlcAppids) {
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const appDetailsCache = new Map(); // "appid:cc" -> { fetchedAt, entry }
 
+/* -------------------------------------------------------------------------- */
+/* StoreBrowse fallback                                                      */
+/* -------------------------------------------------------------------------- */
+// store.steampowered.com/api/appdetails is an old, undocumented endpoint
+// with heavy bot-protection, and it going down for a stretch of games
+// (Batman included) with no code change on our side points at Steam
+// tightening that up, not at anything in our request. api.steampowered.com
+// /IStoreBrowseService/GetItems is the modern, official endpoint the real
+// Steam store website itself uses, hosted on a different domain — it
+// already worked reliably for images (api/steam-image.js), and it can
+// also return screenshots, trailers, description, and reviews. Used here
+// as a full fallback whenever appdetails fails, instead of just giving up.
+const STEAM_CDN = "https://shared.akamai.steamstatic.com/store_item_assets/";
+const storeBrowseCache = new Map(); // "appid:cc" -> { fetchedAt, item }
+
+function buildAssetUrl(urlFormat, filename) {
+  const format = String(urlFormat || "").trim();
+  const file = String(filename || "").trim();
+  if (!format || !file || !format.includes("${FILENAME}")) return null;
+  const substituted = format.replace("${FILENAME}", file);
+  // Images (assets.asset_url_format) are a bare relative path that needs
+  // our image CDN prefix — confirmed working (this is exactly how library
+  // header art already loads). Trailers (trailer.trailer_url_format) are
+  // a SEPARATE field pointing at Steam's video CDN, not the image one,
+  // and it comes back as an already-complete URL — prefixing it too was
+  // turning a real, working video link into garbage, which is why
+  // thumbnails (built the same way, but coincidentally still resolvable
+  // as an image path) showed up while every actual video 404'd.
+  return substituted.includes("://")
+    ? substituted
+    : `${STEAM_CDN}${substituted}`;
+}
+
+// Screenshot filenames are a bare CDN path with no size baked in — Steam's
+// own store site appends one of a few known size suffixes to get an
+// actual file.
+function buildScreenshotUrls(filename) {
+  const file = String(filename || "").trim();
+  if (!file) return null;
+  return {
+    thumb: `${STEAM_CDN}${file}.600x338.jpg`,
+    full: `${STEAM_CDN}${file}.1920x1080.jpg`,
+  };
+}
+
+// Verifies a candidate video URL actually resolves before it's ever sent
+// to the browser, since the player showing "this trailer can't play
+// here" is a dead end for the user — better to just leave a broken
+// candidate out of the list entirely (falls through to whatever other
+// candidate/trailer *does* work, or to "Watch on Steam" only as a true
+// last resort). Browser-side this would need CORS Steam doesn't grant;
+// server-side there's no such restriction. HEAD first (cheapest); some
+// CDNs 405 on HEAD, so a 1-byte ranged GET is the fallback.
+async function verifiedVideoUrl(url) {
+  if (!url) return null;
+  // Steam's video CDN enforces hotlink protection that images don't —
+  // without a Referer/Origin claiming to be store.steampowered.com, it
+  // was rejecting every request THIS server made to verify a URL, which
+  // silently zeroed out every trailer (they were correct, they just
+  // never passed our own check). A real browser loading the page
+  // wouldn't hit this, since its Referer is already the deployed site,
+  // but a server-to-server verification call needs to fake one.
+  const videoHeaders = {
+    ...STEAM_FETCH_HEADERS,
+    Referer: "https://store.steampowered.com/",
+    Origin: "https://store.steampowered.com",
+  };
+  try {
+    const head = await fetch(url, {
+      method: "HEAD",
+      headers: videoHeaders,
+      signal: AbortSignal.timeout(5000),
+    });
+    if (head.ok) return url;
+  } catch {
+    /* fall through to ranged GET */
+  }
+  try {
+    const ranged = await fetch(url, {
+      headers: { ...videoHeaders, Range: "bytes=0-0" },
+      signal: AbortSignal.timeout(5000),
+    });
+    return ranged.ok ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchStoreBrowseRaw(appid, cc) {
+  const input = {
+    ids: [{ appid: Number(appid) }],
+    context: {
+      language: "english",
+      country_code: cc.toUpperCase(),
+      steam_realm: 1,
+    },
+    data_request: {
+      include_assets: true,
+      include_screenshots: true,
+      include_trailers: true,
+      include_basic_info: true,
+      include_reviews: true,
+      include_all_purchase_options: true,
+    },
+  };
+  const url =
+    "https://api.steampowered.com/IStoreBrowseService/GetItems/v1/" +
+    `?input_json=${encodeURIComponent(JSON.stringify(input))}`;
+  const r = await fetch(url, {
+    headers: STEAM_FETCH_HEADERS,
+    signal: AbortSignal.timeout(9000),
+  });
+  if (!r.ok) throw new Error(`Steam GetItems returned ${r.status}`);
+  const json = await r.json();
+  const item = json?.response?.store_items?.[0];
+  if (!item || item.visible === false) return null;
+  return item;
+}
+
+async function fetchStoreBrowseCached(appid, cc) {
+  const key = `${appid}:${cc}`;
+  const cached = storeBrowseCache.get(key);
+  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS)
+    return cached.item;
+  let item = null;
+  try {
+    item = await fetchStoreBrowseRaw(appid, cc);
+  } catch {
+    return null; // not cached — a transient failure should be retried next time
+  }
+  if (item) storeBrowseCache.set(key, { fetchedAt: Date.now(), item });
+  return item;
+}
+
+// Steam Video CDN URLs go through /api/steam-video-proxy instead of
+// being handed to the browser directly — the CDN's hotlink protection
+// accepts our own server's faked Referer (used to verify them above) but
+// will reject the real browser's own referrer, which is what "this
+// trailer can't play here" actually was.
+function proxied(url) {
+  return url ? `/api/steam-video-proxy?url=${encodeURIComponent(url)}` : null;
+}
+
+async function mapStoreItemToDetails(item) {
+  // Steam's own store page shows screenshots in their `ordinal` order,
+  // not necessarily the order the API happens to list them in.
+  const screenshots = [...(item.screenshots?.all_ages_screenshots || [])]
+    .sort((a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0))
+    .slice(0, 12)
+    .map((s) => buildScreenshotUrls(s.filename))
+    .filter(Boolean);
+
+  // Highlighted trailers first, then the rest — capped generously so a
+  // game with several videos isn't cut down to three.
+  const trailers = [
+    ...(item.trailers?.highlights || []),
+    ...(item.trailers?.other_trailers || []),
+  ].slice(0, 10);
+
+  const moviesRaw = await Promise.all(
+    trailers.map(async (t, i) => {
+      const tf = t.trailer_url_format;
+      // Every quality tier is pooled into one candidate list rather than
+      // trying to pick "the" mp4/webm — the player doesn't care which
+      // slot a URL is in, it just tries src values in order and falls
+      // through on error, so what matters is having real, VERIFIED
+      // candidates rather than correctly-labeled ones.
+      const allSources = [
+        ...(t.trailer_max || []),
+        ...(t.trailer_480p || []),
+        ...(t.microtrailer || []),
+      ];
+      const candidates = [
+        ...new Set(
+          allSources.map((s) => buildAssetUrl(tf, s?.filename)).filter(Boolean),
+        ),
+      ];
+      const verified = (
+        await Promise.all(candidates.map(verifiedVideoUrl))
+      ).filter(Boolean);
+      // If verification couldn't confirm anything — including if the
+      // Referer/Origin fix above still isn't the complete picture for
+      // some edge case — fall back to the best raw candidate rather than
+      // showing nothing at all. A real browser might still play it even
+      // if this server's own check couldn't confirm it.
+      const playable = verified.length > 0 ? verified : candidates.slice(0, 1);
+      return {
+        id: t.trailer_base_id ?? i,
+        name: t.trailer_name || null,
+        thumbnail: proxied(buildAssetUrl(tf, t.screenshot_medium)),
+        mp4: proxied(playable[0]),
+        webm: proxied(playable[1]),
+        hls: null,
+      };
+    }),
+  );
+  const movies = moviesRaw.filter((m) => m.mp4 || m.webm);
+
+  const bpo = item.best_purchase_option;
+  const price = bpo
+    ? {
+        final: bpo.final_price_in_cents / 100,
+        initial:
+          (bpo.original_price_in_cents ?? bpo.final_price_in_cents) / 100,
+        discountPercent: bpo.discount_pct || 0,
+        currency: null, // formatted_final_price/formatted_original_price already carry the symbol
+        formattedFinal: bpo.formatted_final_price || null,
+        formattedInitial: bpo.formatted_original_price || null,
+      }
+    : null;
+
+  const rs = item.reviews?.summary_filtered;
+  const reviews = rs?.review_count
+    ? {
+        description: rs.review_score_label || null,
+        totalPositive: Math.round(
+          (rs.percent_positive / 100) * rs.review_count,
+        ),
+        totalReviews: rs.review_count,
+        percentPositive: rs.percent_positive,
+      }
+    : null;
+
+  return {
+    found: true,
+    description: item.basic_info?.short_description || null,
+    screenshots,
+    movies,
+    movie: movies[0]
+      ? { thumbnail: movies[0].thumbnail, mp4: movies[0].mp4 }
+      : null,
+    // StoreBrowse's genre-like data is tag IDs, not plain names, so this
+    // path can't fill genres in without a separate tag-name lookup.
+    genres: [],
+    dlc: [],
+    price,
+    free: !!item.is_free,
+    storeBrowseReviews: reviews, // used as a fallback if fetchReviewSummary also came up empty
+  };
+}
+
 // store.steampowered.com/api/appdetails is undocumented and has a real
 // per-IP rate limit. Without a fixed cc= (country code) it also guesses
 // region from the calling server's IP on every request, which can flip
@@ -327,6 +568,22 @@ export default async function handler(req, res) {
     const entry = await fetchAppDetailsCached(appid, cc);
 
     if (!entry?.success || !entry.data) {
+      // appdetails failed — try StoreBrowse (a different Steam domain/
+      // endpoint) before giving up, since it's often unaffected when
+      // appdetails specifically is having a bad day.
+      const storeItem = await fetchStoreBrowseCached(appid, cc);
+      if (storeItem) {
+        const mapped = await mapStoreItemToDetails(storeItem);
+        const { storeBrowseReviews, ...payload } = mapped;
+        res.status(200).json({
+          ...payload,
+          news: await newsPromise,
+          playerCount: await playerCountPromise,
+          reviews: (await reviewsPromise) || storeBrowseReviews,
+        });
+        return;
+      }
+
       // Not every appid has a store page (demos, tools, delisted games,
       // region-restricted) — a normal outcome, not an error. News can
       // still exist for it, so it's included rather than dropped.
@@ -358,16 +615,21 @@ export default async function handler(req, res) {
     // Trailers: Steam gives mp4 and webm at "480" and "max" quality.
     const pick = (o) => (o ? https(o.max || o["480"] || null) : null);
     const movies = Array.isArray(d.movies)
-      ? d.movies.slice(0, 3).map((m) => ({
-          id: m.id,
-          name: m.name || null,
-          thumbnail: https(m.thumbnail),
-          mp4: pick(m.mp4),
-          webm: pick(m.webm),
-          // Steam has been moving trailers to HLS streams (.m3u8); passed
-          // through so the frontend can play them if mp4/webm are missing.
-          hls: https(m.hls_h264 || m.hls || null),
-        }))
+      ? [...d.movies]
+          // Steam's "top two" trailers are the highlighted ones — put those
+          // first so they're the two shown ahead of the screenshots.
+          .sort((a, b) => (b.highlight ? 1 : 0) - (a.highlight ? 1 : 0))
+          .slice(0, 10)
+          .map((m) => ({
+            id: m.id,
+            name: m.name || null,
+            thumbnail: https(m.thumbnail),
+            mp4: pick(m.mp4),
+            webm: pick(m.webm),
+            // Steam has been moving trailers to HLS streams (.m3u8); passed
+            // through so the frontend can play them if mp4/webm are missing.
+            hls: https(m.hls_h264 || m.hls || null),
+          }))
       : [];
 
     const news = await newsPromise;

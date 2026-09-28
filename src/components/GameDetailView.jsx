@@ -64,16 +64,21 @@ export default function GameDetailView({ game, theme, highlight, onBack }) {
     };
   }, [game.appid]);
 
-  // Trailers first, then screenshots — same order as Steam's store page.
+  // Same order as Steam's own store page: only the top TWO trailers sit
+  // ahead of the screenshots (Valve's rule since May 2023) — any further
+  // trailers come after the screenshots, not before them.
   const media = [];
   if (details?.found) {
-    (details.movies || []).forEach((m) => {
-      if (m.thumbnail || m.mp4 || m.webm)
-        media.push({ type: "video", key: `v${m.id}`, ...m });
-    });
+    const videos = (details.movies || []).filter(
+      (m) => m.thumbnail || m.mp4 || m.webm,
+    );
+    const pushVideo = (m) =>
+      media.push({ type: "video", key: `v${m.id}`, ...m });
+    videos.slice(0, 2).forEach(pushVideo);
     (details.screenshots || []).forEach((s, i) =>
       media.push({ type: "image", key: `s${i}`, shotIndex: i, ...s }),
     );
+    videos.slice(2).forEach(pushVideo);
   }
   const screenshots = details?.found ? details.screenshots || [] : [];
   const current = media[active];
@@ -774,69 +779,252 @@ function NewsModal({ news, theme, onClose }) {
   );
 }
 
-// Plays a Steam trailer inside the page. Tries the plain webm/mp4 files
-// first; if those are missing or fail, falls back to Steam's HLS stream
-// (Steam has been moving trailers to HLS). Safari plays HLS natively;
-// every other browser uses hls.js, loaded only when it's actually needed
-// so it doesn't add to the normal page weight. Only if ALL of that fails
-// does the parent show the "Watch on Steam" link.
+// Plays a Steam trailer inside the page.
+//
+// Prefers Steam's HLS stream when there is one, because that's the only
+// source that can hold several qualities: hls.js reports whichever levels
+// the stream really contains, and the small menu in the corner lists
+// exactly those (plus "Auto", which lets the player pick by bandwidth).
+// Nothing is invented — a trailer whose stream has one level gets no menu.
+//
+// If HLS can't be used (no stream, blocked by the browser, or it errors),
+// it falls back to the plain webm/mp4 file exactly as before, and only if
+// that fails too does the parent show the "Watch on Steam" link. Safari
+// plays HLS natively, which doesn't expose levels, so it gets no menu.
+// hls.js is loaded only when needed so it doesn't add to page weight.
+
+// Remembered for the tab's lifetime so picking 1080p once applies to the
+// next trailer too, and so a stream Steam's CDN won't let us read is only
+// tried once instead of costing a failed request on every trailer.
+let preferredQuality = null; // a height like 1080, or null for Auto
+let hlsUnavailable = false;
+
 function TrailerPlayer({ movie, autoPlay, onFail }) {
   const videoRef = useRef(null);
+  const hlsRef = useRef(null);
+  const menuRef = useRef(null);
   const files = [movie.webm, movie.mp4].filter(Boolean);
+
+  const [mode, setMode] = useState(
+    movie.hls && !hlsUnavailable ? "hls" : "file",
+  );
   const [fileIndex, setFileIndex] = useState(0);
-  const useHls = fileIndex >= files.length && !!movie.hls;
 
+  const [options, setOptions] = useState([]); // [{ height, index }] tallest first
+  const [choice, setChoice] = useState(null); // null = Auto, else a height
+  const [autoHeight, setAutoHeight] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // File mode ran out of files -> nothing left to try.
   useEffect(() => {
-    if (fileIndex >= files.length && !movie.hls) onFail();
+    if (mode === "file" && fileIndex >= files.length) onFail();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fileIndex]);
+  }, [mode, fileIndex]);
 
   useEffect(() => {
-    if (!useHls) return;
+    if (mode !== "hls") return;
     const video = videoRef.current;
     if (!video) return;
-    let hls;
     let cancelled = false;
+    let hls = null;
+
+    const fallBackToFile = (blocked) => {
+      if (blocked) hlsUnavailable = true;
+      if (cancelled) return;
+      setMode("file");
+      setFileIndex(0);
+    };
 
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = movie.hls; // Safari / iOS
+      video.src = movie.hls; // Safari / iOS — native, no level list available
       if (autoPlay) video.play().catch(() => {});
-    } else {
-      import("hls.js")
-        .then(({ default: Hls }) => {
-          if (cancelled) return;
-          if (!Hls.isSupported()) return onFail();
-          hls = new Hls();
-          hls.loadSource(movie.hls);
-          hls.attachMedia(video);
-          hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            if (autoPlay) video.play().catch(() => {});
-          });
-          hls.on(Hls.Events.ERROR, (_e, data) => {
-            if (data.fatal) onFail();
-          });
-        })
-        .catch(() => !cancelled && onFail());
+      return () => {
+        cancelled = true;
+      };
     }
+
+    import("hls.js")
+      .then(({ default: Hls }) => {
+        if (cancelled) return;
+        if (!Hls.isSupported()) return fallBackToFile(false);
+
+        hls = new Hls();
+        hlsRef.current = hls;
+        hls.loadSource(movie.hls);
+        hls.attachMedia(video);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          // One entry per distinct height (a stream can list several
+          // bitrates for the same height — keep the best one).
+          const byHeight = new Map();
+          hls.levels.forEach((lvl, index) => {
+            if (!lvl.height) return;
+            const prev = byHeight.get(lvl.height);
+            if (
+              !prev ||
+              (lvl.bitrate || 0) > (hls.levels[prev.index].bitrate || 0)
+            ) {
+              byHeight.set(lvl.height, { height: lvl.height, index });
+            }
+          });
+          const list = [...byHeight.values()].sort(
+            (a, b) => b.height - a.height,
+          );
+          setOptions(list);
+
+          // Re-apply the quality picked on an earlier trailer, using the
+          // closest height this stream actually has.
+          if (preferredQuality != null && list.length > 1) {
+            const pick =
+              list.find((o) => o.height <= preferredQuality) ||
+              list[list.length - 1];
+            hls.currentLevel = pick.index;
+            setChoice(pick.height);
+          }
+          if (autoPlay) video.play().catch(() => {});
+        });
+
+        hls.on(Hls.Events.LEVEL_SWITCHED, (_e, data) => {
+          const h = hls.levels[data.level]?.height;
+          if (h) setAutoHeight(h);
+        });
+
+        hls.on(Hls.Events.ERROR, (_e, data) => {
+          if (!data.fatal) return;
+          // A manifest we can't even read is the CDN refusing us (usually
+          // CORS) — remember that so later trailers skip straight to files.
+          const manifestBlocked =
+            data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR ||
+            data.details === Hls.ErrorDetails.MANIFEST_LOAD_TIMEOUT;
+          hls.destroy();
+          hlsRef.current = null;
+          if (files.length) fallBackToFile(manifestBlocked);
+          else onFail();
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        if (files.length) fallBackToFile(false);
+        else onFail();
+      });
+
     return () => {
       cancelled = true;
       if (hls) hls.destroy();
+      hlsRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [useHls, movie.hls]);
+  }, [mode, movie.hls]);
+
+  // Close the menu on outside click / Escape.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    };
+    const onKey = (e) => e.key === "Escape" && setMenuOpen(false);
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
+
+  const pickQuality = (height) => {
+    const hls = hlsRef.current;
+    if (!hls) return;
+    if (height == null) {
+      hls.currentLevel = -1; // Auto
+    } else {
+      const opt = options.find((o) => o.height === height);
+      if (opt) hls.currentLevel = opt.index;
+    }
+    preferredQuality = height;
+    setChoice(height);
+    setMenuOpen(false);
+  };
+
+  const showMenu = mode === "hls" && options.length > 1;
+  const label =
+    choice == null
+      ? autoHeight
+        ? `Auto · ${autoHeight}p`
+        : "Auto"
+      : `${choice}p`;
 
   return (
-    <video
-      ref={videoRef}
-      controls
-      playsInline
-      autoPlay={autoPlay}
-      poster={movie.thumbnail || undefined}
-      src={!useHls ? files[fileIndex] : undefined}
-      onError={() => {
-        if (!useHls) setFileIndex((i) => i + 1);
-      }}
-      className="absolute inset-0 w-full h-full bg-black"
-    />
+    <div className="absolute inset-0">
+      <video
+        ref={videoRef}
+        controls
+        playsInline
+        autoPlay={autoPlay}
+        poster={movie.thumbnail || undefined}
+        src={mode === "file" ? files[fileIndex] : undefined}
+        onError={() => {
+          if (mode === "file") setFileIndex((i) => i + 1);
+        }}
+        className="absolute inset-0 w-full h-full bg-black"
+      />
+
+      {showMenu && (
+        <div ref={menuRef} className="absolute top-2 right-2 z-10">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-label={`Video quality: ${label}`}
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-black text-white backdrop-blur-sm cursor-pointer"
+            style={{ background: "rgba(0,0,0,0.6)" }}
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+            </svg>
+            {label}
+          </button>
+
+          {menuOpen && (
+            <ul
+              role="menu"
+              className="mt-1 min-w-[120px] overflow-hidden rounded-md py-1 text-[12px] font-bold text-white shadow-lg"
+              style={{ background: "rgba(0,0,0,0.85)" }}
+            >
+              {[{ height: null }, ...options].map((o) => {
+                const active = choice === o.height;
+                return (
+                  <li key={o.height ?? "auto"} role="none">
+                    <button
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={active}
+                      onClick={() => pickQuality(o.height)}
+                      className="flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left cursor-pointer hover:bg-white/15"
+                    >
+                      <span>{o.height == null ? "Auto" : `${o.height}p`}</span>
+                      {active && <span aria-hidden="true">✓</span>}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
