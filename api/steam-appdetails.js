@@ -619,7 +619,7 @@ export default async function handler(req, res) {
           // Steam's "top two" trailers are the highlighted ones — put those
           // first so they're the two shown ahead of the screenshots.
           .sort((a, b) => (b.highlight ? 1 : 0) - (a.highlight ? 1 : 0))
-          .slice(0, 10)
+          .slice(0, 100) // was 10 before so only 10 videos were loading but what if there are more so updated it to 100
           .map((m) => ({
             id: m.id,
             name: m.name || null,
