@@ -14,7 +14,7 @@ const OPTIONS = [
 // rendered inside that clipped container. Rendering it into a portal on
 // document.body sidesteps that entirely; position is computed from the
 // trigger button's real screen coordinates instead.
-export default function SortDropdown({ value, onChange }) {
+export default function SortDropdown({ value, onChange, options = OPTIONS }) {
   const { theme } = useTheme();
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
@@ -39,7 +39,11 @@ export default function SortDropdown({ value, onChange }) {
   useEffect(() => {
     if (!open) return;
     function onClick(e) {
-      if (btnRef.current?.contains(e.target) || panelRef.current?.contains(e.target)) return;
+      if (
+        btnRef.current?.contains(e.target) ||
+        panelRef.current?.contains(e.target)
+      )
+        return;
       setOpen(false);
     }
     function onKey(e) {
@@ -57,7 +61,7 @@ export default function SortDropdown({ value, onChange }) {
     };
   }, [open]);
 
-  const current = OPTIONS.find((o) => o.value === value) || OPTIONS[0];
+  const current = options.find((o) => o.value === value) || options[0];
 
   return (
     <div className="ml-1">
@@ -67,12 +71,24 @@ export default function SortDropdown({ value, onChange }) {
         className="tap-target text-[11.5px] font-bold px-2.5 py-1.5 rounded-sm border-2 uppercase tracking-wide flex items-center gap-1.5 transition-all duration-200 hover:scale-105 active:scale-95"
         style={
           open
-            ? { borderColor: "#e879f9", color: "#e879f9", background: "#e879f922", boxShadow: "0 0 14px #e879f966" }
-            : { background: theme.chipBg, borderColor: theme.chipBorder, color: theme.chipText }
+            ? {
+                borderColor: "#e879f9",
+                color: "#e879f9",
+                background: "#e879f922",
+                boxShadow: "0 0 14px #e879f966",
+              }
+            : {
+                background: theme.chipBg,
+                borderColor: theme.chipBorder,
+                color: theme.chipText,
+              }
         }
       >
         {current.label}
-        <LuChevronDown size={14} className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        <LuChevronDown
+          size={14}
+          className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+        />
       </button>
 
       {open &&
@@ -90,7 +106,7 @@ export default function SortDropdown({ value, onChange }) {
               boxShadow: "0 20px 45px -15px rgba(0,0,0,0.6)",
             }}
           >
-            {OPTIONS.map((o) => (
+            {options.map((o) => (
               <button
                 key={o.value}
                 onClick={() => {
@@ -104,17 +120,19 @@ export default function SortDropdown({ value, onChange }) {
                     : { color: theme.chipText, background: "transparent" }
                 }
                 onMouseEnter={(e) => {
-                  if (o.value !== value) e.currentTarget.style.background = theme.chipBg;
+                  if (o.value !== value)
+                    e.currentTarget.style.background = theme.chipBg;
                 }}
                 onMouseLeave={(e) => {
-                  if (o.value !== value) e.currentTarget.style.background = "transparent";
+                  if (o.value !== value)
+                    e.currentTarget.style.background = "transparent";
                 }}
               >
                 {o.label}
               </button>
             ))}
           </div>,
-          document.body
+          document.body,
         )}
     </div>
   );

@@ -1,10 +1,17 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import { useSteam } from "../../context/SteamContext.jsx";
 import { useSteamMatches } from "../../hooks/useSteamMatches.js";
+import { useSteamListControls } from "../../hooks/useSteamListControls.js";
+import SteamListControls, {
+  ListSummary,
+  NoMatches,
+} from "../../components/SteamListControls.jsx";
 import { GameTile, TileSkeleton } from "../../components/SteamConnect.jsx";
-import { LuDownload } from "react-icons/lu";
+import { LuDownload, LuShuffle } from "react-icons/lu";
+import PickAGame from "../../components/PickAGame.jsx";
+import { pickRandomGame } from "../../lib/steamCompare.js";
 
 // Builds a CSV client-side from data that's already loaded — no extra
 // requests needed. Minimal RFC 4180 quoting (only fields that actually
@@ -32,8 +39,15 @@ function downloadCsv(filename, csv) {
 }
 
 // One page component for both /steam/wishlist and /steam/library —
-// they're the same grid, just different data.
+// they're the same grid, just different data. Keyed by `kind` so the
+// search/sort/filter choices reset when you switch tabs (React would
+// otherwise reuse this instance and carry e.g. "Most played" over to the
+// wishlist, where it doesn't exist).
 export default function SteamGamesPage({ kind }) {
+  return <SteamGamesPageInner key={kind} kind={kind} />;
+}
+
+function SteamGamesPageInner({ kind }) {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const {
@@ -55,6 +69,22 @@ export default function SteamGamesPage({ kind }) {
     [libraryGames],
   );
   const inGameAppid = playerProfile?.inGameAppid || null;
+
+  const controls = useSteamListControls({
+    games,
+    kind,
+    // Only the wishlist can be compared against what you already own, and
+    // only wishlist items can be "free right now" giveaways.
+    libraryAppids: isWishlist ? libraryAppids : null,
+    matchAppIds: isWishlist ? matchAppIds : null,
+  });
+
+  // "Pick a game" (Library only). Picks from what's currently on screen,
+  // so searching/filtering narrows the pool; among those it favours games
+  // you've never played.
+  const [pick, setPick] = useState(null);
+  const handlePick = () =>
+    setPick(pickRandomGame(controls.visible, { excludeAppid: pick?.appid }));
 
   if (status === "loading" || status === "idle") {
     return (
@@ -118,18 +148,46 @@ export default function SteamGamesPage({ kind }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={handleExport}
-          className="tap-target flex items-center gap-1.5 text-[10.5px] font-black uppercase tracking-wide px-3 py-1.5 border cursor-pointer transition-colors duration-150 hover:bg-white/10"
-          style={{ borderColor: theme.surfaceBorder, color: theme.textFaint }}
-        >
-          <LuDownload size={12} /> Export CSV
-        </button>
-      </div>
+      <SteamListControls controls={controls} />
+      <ListSummary controls={controls}>
+        <div className="flex items-center gap-2">
+          {!isWishlist && (
+            <button
+              type="button"
+              onClick={handlePick}
+              disabled={controls.visible.length === 0}
+              className="tap-target flex items-center gap-1.5 text-[10.5px] font-black uppercase tracking-wide px-3 py-1.5 border-2 cursor-pointer transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                borderColor: "#e879f9",
+                color: "#e879f9",
+                background: "#e879f922",
+              }}
+            >
+              <LuShuffle size={12} /> Pick a game
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleExport}
+            className="tap-target flex items-center gap-1.5 text-[10.5px] font-black uppercase tracking-wide px-3 py-1.5 border cursor-pointer transition-colors duration-150 hover:bg-white/10"
+            style={{ borderColor: theme.surfaceBorder, color: theme.textFaint }}
+          >
+            <LuDownload size={12} /> Export CSV
+          </button>
+        </div>
+      </ListSummary>
+      {!isWishlist && pick && (
+        <PickAGame
+          game={pick}
+          theme={theme}
+          onPickAnother={handlePick}
+          onOpen={() => navigate(`/steam/game/${pick.appid}`)}
+          onClose={() => setPick(null)}
+        />
+      )}
+      {controls.visible.length === 0 && <NoMatches controls={controls} />}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        {games.map((g, i) => {
+        {controls.visible.map((g, i) => {
           const badge = isWishlist
             ? libraryAppids.has(g.appid)
               ? { label: "Owned", color: "#2fb4ff" }

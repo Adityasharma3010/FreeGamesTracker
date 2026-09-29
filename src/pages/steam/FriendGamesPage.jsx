@@ -2,6 +2,11 @@ import React from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import { GameTile, TileSkeleton } from "../../components/SteamConnect.jsx";
+import { useSteamListControls } from "../../hooks/useSteamListControls.js";
+import SteamListControls, {
+  ListSummary,
+  NoMatches,
+} from "../../components/SteamListControls.jsx";
 
 // Same grid as SteamGamesPage, fed by the friend's data via Outlet
 // context instead of useSteam(). No CSV export or "owned"/"playing"
@@ -9,11 +14,23 @@ import { GameTile, TileSkeleton } from "../../components/SteamConnect.jsx";
 // which isn't the point of browsing someone else's list.
 export default function FriendGamesPage({ kind }) {
   const { steamid } = useParams();
+  // Keyed so search/sort/filter reset when switching tabs or friends.
+  return <FriendGamesPageInner key={`${kind}-${steamid}`} kind={kind} />;
+}
+
+function FriendGamesPageInner({ kind }) {
+  const { steamid } = useParams();
   const { theme } = useTheme();
   const navigate = useNavigate();
   const { steam, matchAppIds } = useOutletContext();
   const isWishlist = kind === "wishlist";
   const games = isWishlist ? steam.wishlistGames : steam.libraryGames;
+
+  const controls = useSteamListControls({
+    games,
+    kind,
+    matchAppIds: isWishlist ? matchAppIds : null,
+  });
 
   if (steam.status === "loading" || steam.status === "idle") {
     return (
@@ -48,19 +65,24 @@ export default function FriendGamesPage({ kind }) {
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-      {games.map((g, i) => (
-        <GameTile
-          key={g.appid}
-          {...g}
-          theme={theme}
-          highlight={isWishlist && matchAppIds.has(g.appid)}
-          index={i}
-          onSelect={({ appid }) =>
-            navigate(`/steam/friend/${steamid}/game/${appid}`)
-          }
-        />
-      ))}
+    <div className="flex flex-col gap-3">
+      <SteamListControls controls={controls} />
+      <ListSummary controls={controls} />
+      {controls.visible.length === 0 && <NoMatches controls={controls} />}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {controls.visible.map((g, i) => (
+          <GameTile
+            key={g.appid}
+            {...g}
+            theme={theme}
+            highlight={isWishlist && matchAppIds.has(g.appid)}
+            index={i}
+            onSelect={({ appid }) =>
+              navigate(`/steam/friend/${steamid}/game/${appid}`)
+            }
+          />
+        ))}
+      </div>
     </div>
   );
 }

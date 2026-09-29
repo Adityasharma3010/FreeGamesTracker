@@ -83,6 +83,9 @@ async function fetchLibrary(steamid) {
             appid: g.appid,
             name: g.name || `App ${g.appid}`,
             playtime: g.playtime_forever || 0, // minutes, all-time
+            // Unix seconds; 0 = never played. Steam already sends this with
+            // GetOwnedGames — it's what powers "Last played" sorting.
+            lastPlayed: g.rtime_last_played || 0,
             icon: g.img_icon_url
               ? `https://media.steampowered.com/steamcommunity/public/images/apps/${g.appid}/${g.img_icon_url}.jpg`
               : null,
@@ -200,6 +203,9 @@ async function fetchWishlist(steamid) {
               name: nameMap.get(it.appid) || `App ${it.appid}`,
               icon: null,
               priority: typeof it.priority === "number" ? it.priority : 9999,
+              // Unix seconds — powers "Date added" sorting. 0 if Steam
+              // didn't send one for this item.
+              dateAdded: typeof it.date_added === "number" ? it.date_added : 0,
             }))
             .sort((a, b) => a.priority - b.priority),
         };
@@ -237,6 +243,7 @@ async function fetchWishlist(steamid) {
         name: info?.name || `App ${appid}`,
         icon: info?.capsule || null,
         priority: typeof info?.priority === "number" ? info.priority : 9999,
+        dateAdded: typeof info?.added === "number" ? info.added : 0,
       });
     }
     page++;

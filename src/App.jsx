@@ -20,6 +20,7 @@ import FriendLayout from "./pages/steam/FriendLayout.jsx";
 import FriendProfilePage from "./pages/steam/FriendProfilePage.jsx";
 import FriendGamesPage from "./pages/steam/FriendGamesPage.jsx";
 import FriendMatchesPage from "./pages/steam/FriendMatchesPage.jsx";
+import FriendComparePage from "./pages/steam/FriendComparePage.jsx";
 import FriendGamePage from "./pages/steam/FriendGamePage.jsx";
 
 function endTimestamp(g) {
@@ -150,6 +151,7 @@ export default function App() {
         <Route path="wishlist" element={<FriendGamesPage kind="wishlist" />} />
         <Route path="library" element={<FriendGamesPage kind="library" />} />
         <Route path="matches" element={<FriendMatchesPage />} />
+        <Route path="compare" element={<FriendComparePage />} />
         <Route path="game/:appid" element={<FriendGamePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

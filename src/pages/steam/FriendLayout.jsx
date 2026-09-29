@@ -66,7 +66,7 @@ export default function FriendLayout() {
   const navigate = useNavigate();
   const themeCtx = useTheme();
   const { theme } = themeCtx;
-  const { connected: viewerConnected } = useSteam();
+  const { connected: viewerConnected, steamid: ownSteamid } = useSteam();
   const steam = useSteamProfileData(steamid);
   const { matches, matchAppIds } = useMatchesFor(
     steam.wishlistGames,
@@ -91,6 +91,11 @@ export default function FriendLayout() {
     },
     { to: `${base}/library`, label: `Library (${steam.libraryGames.length})` },
     { to: `${base}/matches`, label: `Matches (${matches.length})` },
+    // Comparing needs YOUR data too, so it's only offered when you're
+    // signed in — and comparing someone with themselves is pointless.
+    ...(viewerConnected && ownSteamid && ownSteamid !== steamid
+      ? [{ to: `${base}/compare`, label: "Compare" }]
+      : []),
   ];
 
   const panelTheme = { ...themeCtx, dark: true, theme: buildTheme(true) };
