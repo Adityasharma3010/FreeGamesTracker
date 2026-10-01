@@ -11,6 +11,7 @@ import SteamListControls, {
 import { GameTile, TileSkeleton } from "../../components/SteamConnect.jsx";
 import { LuDownload, LuShuffle } from "react-icons/lu";
 import PickAGame from "../../components/PickAGame.jsx";
+import LibraryStats from "../../components/LibraryStats.jsx";
 import { pickRandomGame } from "../../lib/steamCompare.js";
 
 // Builds a CSV client-side from data that's already loaded — no extra
@@ -148,6 +149,13 @@ function SteamGamesPageInner({ kind }) {
 
   return (
     <div className="flex flex-col gap-3">
+      {!isWishlist && (
+        <LibraryStats
+          games={libraryGames}
+          theme={theme}
+          onSelect={({ appid }) => navigate(`/steam/game/${appid}`)}
+        />
+      )}
       <SteamListControls controls={controls} />
       <ListSummary controls={controls}>
         <div className="flex items-center gap-2">

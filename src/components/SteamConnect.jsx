@@ -54,7 +54,7 @@ export function GameTile({
             : "none",
         transform: `perspective(500px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) ${hover ? "translateY(-4px)" : ""}`,
       }}
-      className="group motion-safe:opacity-0 motion-safe:animate-card-in flex flex-col overflow-hidden border transition-[border-color,box-shadow] duration-200 active:scale-[0.97] will-change-transform text-left cursor-pointer"
+      className="group w-full motion-safe:opacity-0 motion-safe:animate-card-in flex flex-col overflow-hidden border transition-[border-color,box-shadow] duration-200 active:scale-[0.97] will-change-transform text-left cursor-pointer"
     >
       <div
         className="relative w-full aspect-[460/215] overflow-hidden"

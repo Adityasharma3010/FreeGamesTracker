@@ -36,7 +36,7 @@ export default function SteamGamePage() {
   const { appid } = useParams();
   const { theme } = useTheme();
   const navigate = useNavigate();
-  const { status, wishlistGames, libraryGames } = useSteam();
+  const { status, steamid, wishlistGames, libraryGames } = useSteam();
   const { matchAppIds } = useSteamMatches();
   const id = Number(appid);
 
@@ -56,6 +56,7 @@ export default function SteamGamePage() {
         game={game}
         theme={theme}
         highlight={matchAppIds.has(id)}
+        steamid={steamid}
         onBack={() =>
           window.history.length > 1 ? navigate(-1) : navigate("/steam/library")
         }

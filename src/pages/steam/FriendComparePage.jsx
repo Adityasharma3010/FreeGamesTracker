@@ -1,94 +1,25 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
+import { LuUsers } from "react-icons/lu";
+import FriendPicker from "../../components/FriendPicker.jsx";
+import CompareView from "../../components/CompareView.jsx";
+import CopyLinkButton from "../../components/CopyLinkButton.jsx";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import { useSteam } from "../../context/SteamContext.jsx";
-import { GameTile, TileSkeleton } from "../../components/SteamConnect.jsx";
-import { compareLibraries, formatHours } from "../../lib/steamCompare.js";
-
-const SHOW_FIRST = 8;
-
-function Section({ title, hint, games, badgeFor, onSelect, theme }) {
-  const [showAll, setShowAll] = useState(false);
-  const shown = showAll ? games : games.slice(0, SHOW_FIRST);
-  return (
-    <section className="flex flex-col gap-2">
-      <div>
-        <h2
-          className="text-[12px] font-black uppercase tracking-wide"
-          style={{ color: theme.text }}
-        >
-          {title}{" "}
-          <span style={{ color: theme.textFaint }}>({games.length})</span>
-        </h2>
-        <p className="text-[11.5px]" style={{ color: theme.textDim }}>
-          {hint}
-        </p>
-      </div>
-
-      {games.length === 0 ? (
-        <p className="text-[12px]" style={{ color: theme.textFaint }}>
-          Nothing here.
-        </p>
-      ) : (
-        <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {shown.map((g, i) => (
-              <GameTile
-                key={g.appid}
-                appid={g.appid}
-                name={g.name}
-                theme={theme}
-                highlight={false}
-                badge={badgeFor ? badgeFor(g) : null}
-                index={i}
-                onSelect={onSelect}
-              />
-            ))}
-          </div>
-          {games.length > SHOW_FIRST && (
-            <button
-              type="button"
-              onClick={() => setShowAll((s) => !s)}
-              className="tap-target self-start text-[10.5px] font-black uppercase tracking-wide px-3 py-1.5 border cursor-pointer transition-colors duration-150 hover:bg-white/10"
-              style={{
-                borderColor: theme.surfaceBorder,
-                color: theme.textFaint,
-              }}
-            >
-              {showAll ? "Show fewer" : `Show all ${games.length}`}
-            </button>
-          )}
-        </>
-      )}
-    </section>
-  );
-}
+import { TileSkeleton } from "../../components/SteamConnect.jsx";
 
 // Your library/wishlist vs the friend's, using data both pages already
 // loaded — no extra requests. Only reachable when you're signed in (the
-// tab is hidden otherwise, see FriendLayout).
+// tab is hidden otherwise, see FriendLayout). The actual comparison UI
+// lives in CompareView so the shareable /steam/compare/:a/:b page can
+// reuse it.
 export default function FriendComparePage() {
   const { steamid } = useParams();
   const { theme } = useTheme();
   const navigate = useNavigate();
   const own = useSteam();
   const { steam } = useOutletContext();
-
-  const result = useMemo(
-    () =>
-      compareLibraries({
-        myLibrary: own.libraryGames,
-        myWishlist: own.wishlistGames,
-        theirLibrary: steam.libraryGames,
-        theirWishlist: steam.wishlistGames,
-      }),
-    [
-      own.libraryGames,
-      own.wishlistGames,
-      steam.libraryGames,
-      steam.wishlistGames,
-    ],
-  );
+  const [picking, setPicking] = useState(false);
 
   if (!own.connected) {
     return (
@@ -117,67 +48,61 @@ export default function FriendComparePage() {
   }
 
   const name = steam.playerProfile?.personaname || "them";
-  const go = ({ appid }) => navigate(`/steam/friend/${steamid}/game/${appid}`);
-  const libraryHidden =
+  const theirLibraryHidden =
     steam.libraryPublic === false || steam.libraryGames.length === 0;
 
   return (
-    <div className="flex flex-col gap-5">
-      <div>
-        <h1 className="text-[16px] font-black" style={{ color: theme.text }}>
-          You and {name}
-        </h1>
-        <p className="text-[12px]" style={{ color: theme.textDim }}>
-          {libraryHidden
-            ? `${name}'s game library isn't visible, so only wishlists can be compared.`
-            : `You both own ${result.both.length} game${result.both.length === 1 ? "" : "s"}.`}
-        </p>
-      </div>
-
-      {!libraryHidden && (
-        <Section
-          title="You both own"
-          hint="Most hours put in together first."
-          games={result.both}
-          badgeFor={(g) => ({
-            label: `You ${formatHours(g.myPlaytime)} · Them ${formatHours(g.theirPlaytime)}`,
-            color: "#2fb4ff",
-          })}
-          onSelect={go}
+    <>
+      <CompareView
+        selfMode
+        theme={theme}
+        me={{
+          steamid: own.steamid,
+          name: own.playerProfile?.personaname || "You",
+          library: own.libraryGames,
+          wishlist: own.wishlistGames,
+          libraryHidden: false,
+        }}
+        them={{
+          steamid,
+          name,
+          library: steam.libraryGames,
+          wishlist: steam.wishlistGames,
+          libraryHidden: theirLibraryHidden,
+        }}
+        onOpenGame={({ appid }) =>
+          navigate(`/steam/friend/${steamid}/game/${appid}`)
+        }
+        actions={
+          <>
+            <CopyLinkButton
+              theme={theme}
+              path={`/steam/compare/${own.steamid}/${steamid}`}
+            />
+            <button
+              type="button"
+              onClick={() => setPicking(true)}
+              className="tap-target shrink-0 flex items-center gap-1.5 text-[10.5px] font-black uppercase tracking-wide px-3 py-1.5 border cursor-pointer transition-colors duration-150 hover:bg-white/10"
+              style={{
+                borderColor: theme.surfaceBorder,
+                color: theme.textFaint,
+              }}
+            >
+              <LuUsers size={12} /> Switch friend
+            </button>
+          </>
+        }
+      />
+      {picking && (
+        <FriendPicker
+          steamid={own.steamid}
           theme={theme}
+          onClose={() => setPicking(false)}
+          onSelect={(friendSteamid) =>
+            navigate(`/steam/friend/${friendSteamid}/compare`)
+          }
         />
       )}
-      {!libraryHidden && (
-        <Section
-          title="On your wishlist — they own it"
-          hint={`Games you want that ${name} already has.`}
-          games={result.theyOwnYourWishlist}
-          badgeFor={(g) => ({
-            label: `Them ${formatHours(g.theirPlaytime)}`,
-            color: "#e879f9",
-          })}
-          onSelect={go}
-          theme={theme}
-        />
-      )}
-      <Section
-        title="On their wishlist — you own it"
-        hint={`Games ${name} wants that you already have.`}
-        games={result.youOwnTheirWishlist}
-        badgeFor={(g) => ({
-          label: `You ${formatHours(g.myPlaytime)}`,
-          color: "#7dff70",
-        })}
-        onSelect={go}
-        theme={theme}
-      />
-      <Section
-        title="On both wishlists"
-        hint="Games you both want."
-        games={result.bothWant}
-        onSelect={go}
-        theme={theme}
-      />
-    </div>
+    </>
   );
 }

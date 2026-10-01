@@ -53,6 +53,7 @@ export default function FriendGamePage() {
         game={game}
         theme={theme}
         highlight={matchAppIds.has(id)}
+        steamid={steamid}
         onBack={() =>
           window.history.length > 1
             ? navigate(-1)

@@ -3,10 +3,14 @@ import { useOutletContext, useParams } from "react-router-dom";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import SteamProfileView from "../../components/SteamProfileView.jsx";
 
+// The FRIEND's profile. All data comes from FriendLayout via the outlet
+// context (useSteamProfileData(steamid)) — never from useSteam(), which is
+// the signed-in user's own account.
 export default function FriendProfilePage() {
-  const { steamid } = useParams();
   const { theme } = useTheme();
+  const { steamid } = useParams();
   const { steam, matches, matchAppIds } = useOutletContext();
+  const base = `/steam/friend/${steamid}`;
 
   return (
     <SteamProfileView
@@ -20,11 +24,8 @@ export default function FriendProfilePage() {
       libraryGames={steam.libraryGames}
       matches={matches}
       matchAppIds={matchAppIds}
-      basePath={`/steam/friend/${steamid}`}
-      gamePath={(appid) => `/steam/friend/${steamid}/game/${appid}`}
-      // No friendPath here — a friend-of-a-friend link would need this
-      // page to go two levels deep in-app, which isn't worth it; their
-      // friends list still just links out to Steam directly.
+      basePath={base}
+      gamePath={(appid) => `${base}/game/${appid}`}
     />
   );
 }

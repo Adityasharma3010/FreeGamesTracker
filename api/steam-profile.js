@@ -138,7 +138,16 @@ async function fetchGlobalPercentages(appid) {
   )
     .then((json) => {
       const map = new Map();
-      (json?.achievementpercentages?.achievements || []).forEach((a) => map.set(a.name, a.percent));
+      (json?.achievementpercentages?.achievements || []).forEach((a) => {
+        if (!a?.name) return;
+        // Steam sends this as a numeric STRING ("45.6779"), not a number.
+        // The frontend's `typeof a.percent === "number"` guard silently
+        // hid the rarity percentage entirely rather than crashing here —
+        // same root cause as the crash in api/steam-achievements.js, just
+        // a quieter symptom. Coerced once, here, same fix.
+        const pct = Number(a.percent);
+        if (Number.isFinite(pct)) map.set(a.name, pct);
+      });
       return map;
     })
     .catch(() => new Map());
@@ -209,7 +218,9 @@ async function fetchRecent(id) {
 
 export default async function handler(req, res) {
   if (!STEAM_API_KEY) {
-    res.status(500).json({ error: "STEAM_API_KEY is not configured on the server." });
+    res
+      .status(500)
+      .json({ error: "STEAM_API_KEY is not configured on the server." });
     return;
   }
   const { steamid } = req.query;
@@ -236,7 +247,10 @@ export default async function handler(req, res) {
     recentGames.map((g) => g.appid),
   ).catch(() => []);
 
-  res.setHeader("Cache-Control", "public, s-maxage=900, stale-while-revalidate=1800");
+  res.setHeader(
+    "Cache-Control",
+    "public, s-maxage=900, stale-while-revalidate=1800",
+  );
   res.status(200).json({
     avatarFrame: slot(d.avatar_frame, { animatedSmall: true }),
     animatedAvatar: slot(d.animated_avatar, { animatedSmall: true }),

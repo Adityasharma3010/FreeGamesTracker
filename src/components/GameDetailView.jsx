@@ -20,11 +20,23 @@ import {
 const DETAILS_CACHE_TTL_MS = 30 * 60 * 1000;
 const detailsCache = new Map(); // appid -> { fetchedAt, data }
 
+// Same idea, keyed by steamid+appid since achievements are per-player.
+// Deliberately shorter than the details cache — a player's unlocked
+// state changes as they play, an achievement list doesn't.
+const ACHIEVEMENTS_CACHE_TTL_MS = 5 * 60 * 1000;
+const achievementsCache = new Map(); // "steamid:appid" -> { fetchedAt, data }
+
 // Game detail page content: header art, description, and a proper media
 // gallery — one big viewer + a thumbnail strip. Trailers are marked with
 // a play badge; clicking a thumbnail switches the viewer; clicking a
 // screenshot opens it full-size in a lightbox.
-export default function GameDetailView({ game, theme, highlight, onBack }) {
+export default function GameDetailView({
+  game,
+  theme,
+  highlight,
+  onBack,
+  steamid,
+}) {
   const [imgOk, setImgOk] = useState(true);
   const [details, setDetails] = useState(null); // null = loading
   const [active, setActive] = useState(0);
@@ -32,6 +44,8 @@ export default function GameDetailView({ game, theme, highlight, onBack }) {
   const [lightbox, setLightbox] = useState(null); // index into screenshots, or null
   const [openNews, setOpenNews] = useState(null); // the news item object, or null
   const [picked, setPicked] = useState(false); // true once the user has clicked a thumbnail/arrow — only then does a trailer autoplay
+  const [achievements, setAchievements] = useState(null); // null = loading/none requested
+  const [showAllAchievements, setShowAllAchievements] = useState(false);
   const glow = highlight ? "#fbbf24" : "#2fb4ff";
   const storeUrl = `https://store.steampowered.com/app/${game.appid}`;
 
@@ -63,6 +77,43 @@ export default function GameDetailView({ game, theme, highlight, onBack }) {
       cancelled = true;
     };
   }, [game.appid]);
+
+  // Achievements — needs a steamid (the signed-in viewer's own, or the
+  // friend whose page this is), so this simply doesn't run without one
+  // rather than treating it as an error. `steamid` genuinely can arrive
+  // late (e.g. it comes from a still-loading profile fetch) — this effect
+  // re-runs and picks it up rather than only checking once on mount.
+  useEffect(() => {
+    setShowAllAchievements(false);
+    if (!steamid) {
+      setAchievements(null);
+      return;
+    }
+    const appid = game.appid;
+    const key = `${steamid}:${appid}`;
+    let cancelled = false;
+
+    const cached = achievementsCache.get(key);
+    if (cached && Date.now() - cached.fetchedAt < ACHIEVEMENTS_CACHE_TTL_MS) {
+      setAchievements(cached.data);
+      return;
+    }
+
+    setAchievements(null);
+    fetch(`/api/steam-achievements?steamid=${steamid}&appid=${appid}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        achievementsCache.set(key, { fetchedAt: Date.now(), data: d });
+        setAchievements(d);
+      })
+      .catch(() => {
+        if (!cancelled) setAchievements({ found: false, achievements: [] });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [game.appid, steamid]);
 
   // Same order as Steam's own store page: only the top TWO trailers sit
   // ahead of the screenshots (Valve's rule since May 2023) — any further
@@ -484,6 +535,15 @@ export default function GameDetailView({ game, theme, highlight, onBack }) {
         </div>
       )}
 
+      {achievements?.found && (
+        <AchievementsSection
+          data={achievements}
+          theme={theme}
+          showAll={showAllAchievements}
+          setShowAll={setShowAllAchievements}
+        />
+      )}
+
       <a
         href={storeUrl}
         target="_blank"
@@ -605,6 +665,143 @@ function NewsYoutubeBlock({ id }) {
         onLoad={() => setLoaded(true)}
         className="absolute inset-0 w-full h-full border-0"
       />
+    </div>
+  );
+}
+
+// Achievements for the game this page is for, and the player whose
+// steamid was passed in (the signed-in viewer's own, or a friend's).
+// Fetched separately from the main store details — see the effect above
+// — since it needs a steamid that store data never does.
+const SHOW_FIRST_ACHIEVEMENTS = 10;
+
+function AchievementsSection({ data, theme, showAll, setShowAll }) {
+  const { total, unlocked, locked, achievements } = data;
+
+  if (locked) {
+    // The achievement LIST is still real (>0 exist for this game) even
+    // though we can't say which are unlocked — shown as a fact, not an
+    // error state, since a private profile is a normal, common thing.
+    return (
+      <div className="flex flex-col gap-1.5">
+        <h2
+          className="text-[11px] font-black uppercase tracking-wide"
+          style={{ color: theme.textFaint }}
+        >
+          Achievements
+        </h2>
+        <p className="text-[12px]" style={{ color: theme.textDim }}>
+          {locked === "private"
+            ? `This game has ${total} achievements, but this player's achievement progress is private.`
+            : "Achievement progress couldn't be loaded for this game."}
+        </p>
+      </div>
+    );
+  }
+
+  if (total === 0) return null;
+
+  const pct = Math.round((unlocked / total) * 100);
+  const shown = showAll
+    ? achievements
+    : achievements.slice(0, SHOW_FIRST_ACHIEVEMENTS);
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <h2
+          className="text-[11px] font-black uppercase tracking-wide"
+          style={{ color: theme.textFaint }}
+        >
+          Achievements
+        </h2>
+        <span
+          className="text-[11px] font-bold"
+          style={{ color: theme.textFaint }}
+        >
+          {unlocked} / {total} · {pct}%
+        </span>
+      </div>
+
+      <div
+        className="h-1.5 w-full overflow-hidden rounded-full"
+        style={{ background: theme.chipBg }}
+      >
+        <div
+          className="h-full rounded-full transition-[width] duration-500"
+          style={{ width: `${pct}%`, background: "#e879f9" }}
+        />
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-2">
+        {shown.map((a) => {
+          // A hidden achievement's real description is a spoiler until
+          // unlocked — Steam withholds it from the player too, so this
+          // mirrors that rather than showing text Steam itself hides.
+          const showDescription = a.description && (!a.hidden || a.achieved);
+          return (
+            <div
+              key={a.apiname}
+              className="flex items-center gap-2.5 border px-2.5 py-2"
+              style={{
+                borderColor: theme.surfaceBorder,
+                background: theme.chipBg,
+                opacity: a.achieved ? 1 : 0.6,
+              }}
+            >
+              {(a.achieved ? a.icon : a.iconGray || a.icon) ? (
+                <img
+                  src={a.achieved ? a.icon : a.iconGray || a.icon}
+                  alt=""
+                  loading="lazy"
+                  className="w-9 h-9 shrink-0 rounded"
+                />
+              ) : (
+                <div
+                  className="w-9 h-9 shrink-0 rounded"
+                  style={{ background: theme.surfaceBorder }}
+                  aria-hidden="true"
+                />
+              )}
+              <div className="min-w-0 flex-1">
+                <p
+                  className="text-[11.5px] font-bold leading-snug truncate"
+                  style={{ color: theme.text }}
+                >
+                  {a.hidden && !a.achieved ? "Hidden achievement" : a.name}
+                </p>
+                {showDescription && (
+                  <p
+                    className="text-[10.5px] leading-snug line-clamp-2"
+                    style={{ color: theme.textDim }}
+                  >
+                    {a.description}
+                  </p>
+                )}
+                {Number.isFinite(Number(a.globalPercent)) && (
+                  <p
+                    className="text-[9.5px] font-bold mt-0.5"
+                    style={{ color: theme.textFaint }}
+                  >
+                    {Number(a.globalPercent).toFixed(1)}% of players
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {achievements.length > SHOW_FIRST_ACHIEVEMENTS && (
+        <button
+          type="button"
+          onClick={() => setShowAll((s) => !s)}
+          className="tap-target self-start text-[10.5px] font-black uppercase tracking-wide px-3 py-1.5 border cursor-pointer transition-colors duration-150 hover:bg-white/10"
+          style={{ borderColor: theme.surfaceBorder, color: theme.textFaint }}
+        >
+          {showAll ? "Show fewer" : `Show all ${achievements.length}`}
+        </button>
+      )}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import React from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import { GameTile, TileSkeleton } from "../../components/SteamConnect.jsx";
+import LibraryStats from "../../components/LibraryStats.jsx";
 import { useSteamListControls } from "../../hooks/useSteamListControls.js";
 import SteamListControls, {
   ListSummary,
@@ -66,6 +67,15 @@ function FriendGamesPageInner({ kind }) {
 
   return (
     <div className="flex flex-col gap-3">
+      {!isWishlist && (
+        <LibraryStats
+          games={steam.libraryGames}
+          theme={theme}
+          onSelect={({ appid }) =>
+            navigate(`/steam/friend/${steamid}/game/${appid}`)
+          }
+        />
+      )}
       <SteamListControls controls={controls} />
       <ListSummary controls={controls} />
       {controls.visible.length === 0 && <NoMatches controls={controls} />}
