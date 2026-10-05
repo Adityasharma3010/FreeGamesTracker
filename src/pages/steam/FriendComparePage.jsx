@@ -59,6 +59,8 @@ export default function FriendComparePage() {
         me={{
           steamid: own.steamid,
           name: own.playerProfile?.personaname || "You",
+          avatar: own.playerProfile?.avatar,
+          level: own.equipped?.level,
           library: own.libraryGames,
           wishlist: own.wishlistGames,
           libraryHidden: false,
@@ -66,6 +68,8 @@ export default function FriendComparePage() {
         them={{
           steamid,
           name,
+          avatar: steam.playerProfile?.avatar,
+          level: steam.equipped?.level,
           library: steam.libraryGames,
           wishlist: steam.wishlistGames,
           libraryHidden: theirLibraryHidden,

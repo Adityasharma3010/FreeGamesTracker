@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { LuTrophy } from "react-icons/lu";
 import AchievementCompareModal from "./AchievementCompareModal.jsx";
+import CompareHero from "./CompareHero.jsx";
 import { GameTile } from "./SteamConnect.jsx";
 import { compareLibraries, formatHours } from "../lib/steamCompare.js";
 
@@ -106,15 +107,9 @@ export default function CompareView({
   const hiddenNames = [me.libraryHidden && a, them.libraryHidden && b].filter(
     Boolean,
   );
-  const n = result.both.length;
-  const plural = n === 1 ? "" : "s";
 
   let subtitle;
-  if (bothLibraries) {
-    subtitle = selfMode
-      ? `You both own ${n} game${plural}.`
-      : `${n} game${plural} in common.`;
-  } else if (selfMode && them.libraryHidden && !me.libraryHidden) {
+  if (selfMode && them.libraryHidden && !me.libraryHidden) {
     subtitle = `${b}'s game library isn't visible, so only wishlists can be compared.`;
   } else {
     subtitle = `${hiddenNames.join(" and ")}: game library isn't visible, so only some comparisons can be shown.`;
@@ -122,17 +117,24 @@ export default function CompareView({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-[16px] font-black" style={{ color: theme.text }}>
-            {a} and {b}
-          </h1>
-          <p className="text-[12px]" style={{ color: theme.textDim }}>
-            {subtitle}
-          </p>
-        </div>
-        {actions && <div className="flex items-center gap-2">{actions}</div>}
-      </div>
+      <h1 className="sr-only">
+        {a} and {b}
+      </h1>
+      {actions && (
+        <div className="flex items-center justify-end gap-2">{actions}</div>
+      )}
+      <CompareHero
+        me={me}
+        them={them}
+        both={result.both}
+        theme={theme}
+        selfMode={selfMode}
+      />
+      {!bothLibraries && (
+        <p className="text-[12px]" style={{ color: theme.textDim }}>
+          {subtitle}
+        </p>
+      )}
 
       {bothLibraries && (
         <Section

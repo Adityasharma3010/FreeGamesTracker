@@ -65,6 +65,8 @@ export default function PublicComparePage() {
         me={{
           steamid: a,
           name: A.playerProfile?.personaname || "Player 1",
+          avatar: A.playerProfile?.avatar,
+          level: A.equipped?.level,
           library: A.libraryGames,
           wishlist: A.wishlistGames,
           libraryHidden: hidden(A),
@@ -72,6 +74,8 @@ export default function PublicComparePage() {
         them={{
           steamid: b,
           name: B.playerProfile?.personaname || "Player 2",
+          avatar: B.playerProfile?.avatar,
+          level: B.equipped?.level,
           library: B.libraryGames,
           wishlist: B.wishlistGames,
           libraryHidden: hidden(B),
