@@ -59,7 +59,10 @@ function Side({ player, theme, align }) {
       >
         {player.name}
       </span>
-      <span className="text-[10.5px] sm:text-[11px]" style={{ color: theme.textDim }}>
+      <span
+        className="text-[10.5px] sm:text-[11px]"
+        style={{ color: theme.textDim }}
+      >
         {stats
           ? `${stats.total.toLocaleString("en-US")} games · ${Math.round(stats.totalHours).toLocaleString("en-US")}h`
           : "Library private"}
@@ -161,10 +164,10 @@ export default function CompareHero({ me, them, both, theme, selfMode }) {
   const shared = both.length;
   const score = bothLibraries
     ? computeMatchScore({
-      shared,
-      myCount: me.library.length,
-      theirCount: them.library.length,
-    })
+        shared,
+        myCount: me.library.length,
+        theirCount: them.library.length,
+      })
     : null;
   const highlights = useMemo(
     () => (bothLibraries ? computeHighlights(both) : null),
@@ -212,14 +215,6 @@ export default function CompareHero({ me, them, both, theme, selfMode }) {
 
       {highlights && (
         <div className="flex flex-wrap gap-2">
-          {highlights.mostTogether && (
-            <Chip
-              theme={theme}
-              label="Most hours together"
-              value={highlights.mostTogether.name}
-              sub={`${formatHours(highlights.mostTogether.myPlaytime + highlights.mostTogether.theirPlaytime)} combined`}
-            />
-          )}
           {highlights.biggestGap && (
             <Chip
               theme={theme}

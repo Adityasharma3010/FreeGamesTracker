@@ -2,6 +2,8 @@ import React, { useMemo, useState } from "react";
 import { LuTrophy } from "react-icons/lu";
 import AchievementCompareModal from "./AchievementCompareModal.jsx";
 import CompareHero from "./CompareHero.jsx";
+import CompareSpotlight from "./CompareSpotlight.jsx";
+import { computeHighlights } from "../lib/steamCompareInsights.js";
 import { GameTile } from "./SteamConnect.jsx";
 import { compareLibraries, formatHours } from "../lib/steamCompare.js";
 
@@ -104,6 +106,10 @@ export default function CompareView({
   const a = selfMode ? "You" : me.name;
   const b = them.name;
   const bothLibraries = !me.libraryHidden && !them.libraryHidden;
+  const spotlight = useMemo(
+    () => (bothLibraries ? computeHighlights(result.both)?.mostTogether : null),
+    [bothLibraries, result.both],
+  );
   const hiddenNames = [me.libraryHidden && a, them.libraryHidden && b].filter(
     Boolean,
   );
@@ -134,6 +140,20 @@ export default function CompareView({
         <p className="text-[12px]" style={{ color: theme.textDim }}>
           {subtitle}
         </p>
+      )}
+
+      {spotlight && (
+        <CompareSpotlight
+          game={spotlight}
+          aName={a}
+          bName={b}
+          onOpen={() =>
+            onOpenGame({ appid: spotlight.appid, name: spotlight.name })
+          }
+          onCompareAchievements={() =>
+            setComparingAchv({ appid: spotlight.appid, name: spotlight.name })
+          }
+        />
       )}
 
       {bothLibraries && (
