@@ -606,7 +606,7 @@ export default async function handler(req, res) {
     // short_description is Steam's own plain-text summary. The detailed
     // description is raw HTML that would need sanitizing first.
     const screenshots = Array.isArray(d.screenshots)
-      ? d.screenshots.slice(0, 100).map((s) => ({
+      ? d.screenshots.slice(0, 1000).map((s) => ({
           // // was 12 before so only max 12 images were loading but what if there are more so updated it to 100
           thumb: https(s.path_thumbnail),
           full: https(s.path_full),
@@ -620,7 +620,7 @@ export default async function handler(req, res) {
           // Steam's "top two" trailers are the highlighted ones — put those
           // first so they're the two shown ahead of the screenshots.
           .sort((a, b) => (b.highlight ? 1 : 0) - (a.highlight ? 1 : 0))
-          .slice(0, 100) // was 10 before so only max 10 videos were loading but what if there are more so updated it to 100
+          .slice(0, 1000) // was 10 before so only max 10 videos were loading but what if there are more so updated it to 100
           .map((m) => ({
             id: m.id,
             name: m.name || null,
