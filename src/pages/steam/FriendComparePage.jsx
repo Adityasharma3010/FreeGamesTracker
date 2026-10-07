@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { LuUsers } from "react-icons/lu";
 import FriendPicker from "../../components/FriendPicker.jsx";
 import CompareView from "../../components/CompareView.jsx";
 import CopyLinkButton from "../../components/CopyLinkButton.jsx";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { useTheme } from "../../context/ThemeContext.jsx";
+import { rememberFriend } from "../../lib/steamRecentFriends.js";
 import { useSteam } from "../../context/SteamContext.jsx";
 import { TileSkeleton } from "../../components/SteamConnect.jsx";
 
@@ -20,6 +21,20 @@ export default function FriendComparePage() {
   const own = useSteam();
   const { steam } = useOutletContext();
   const [picking, setPicking] = useState(false);
+
+  // Remember who you compared with (powers the "Compare with <name>"
+  // shortcut and the Recent list in the friend picker).
+  const friendName = steam.playerProfile?.personaname;
+  const friendAvatar = steam.playerProfile?.avatar;
+  useEffect(() => {
+    if (own.connected && own.steamid && friendName) {
+      rememberFriend(own.steamid, {
+        steamid,
+        name: friendName,
+        avatar: friendAvatar,
+      });
+    }
+  }, [own.connected, own.steamid, steamid, friendName, friendAvatar]);
 
   if (!own.connected) {
     return (
@@ -100,6 +115,7 @@ export default function FriendComparePage() {
       {picking && (
         <FriendPicker
           steamid={own.steamid}
+          excludeSteamid={steamid}
           theme={theme}
           onClose={() => setPicking(false)}
           onSelect={(friendSteamid) =>

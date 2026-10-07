@@ -7,8 +7,10 @@ import { computeLibraryStats } from "./steamLibraryStats.js";
 import { formatHours } from "./steamCompare.js";
 import { computeMatchScore, matchLabel } from "./steamCompareInsights.js";
 
-const W = 1080;
-const H = 1350;
+const SIZES = {
+  portrait: { w: 1080, h: 1350 },
+  landscape: { w: 1200, h: 630 },
+};
 const BLUE = "#2fb4ff";
 const PINK = "#e879f9";
 
@@ -65,6 +67,20 @@ function fit(ctx, text, maxWidth) {
     t = t.slice(0, -1);
   }
   return t.trimEnd() + "…";
+}
+
+// Draw a name centered at `cx`: shrink the font a little for long names
+// (down to `min`px) before falling back to an ellipsis.
+function drawName(ctx, family, text, cx, y, maxWidth, size, min) {
+  let px = size;
+  ctx.font = `900 ${px}px ${family}`;
+  while (px > min && ctx.measureText(text).width > maxWidth) {
+    px -= 2;
+    ctx.font = `900 ${px}px ${family}`;
+  }
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#fff";
+  ctx.fillText(fit(ctx, text, maxWidth), cx, y);
 }
 
 function spaced(ctx, value) {
@@ -140,16 +156,23 @@ function drawAvatar(ctx, img, player, cx, cy, size, color, family) {
   }
 }
 
-function drawVsRow(ctx, y, row, family) {
-  const left = 160;
-  const right = 920;
+function drawVsRow(ctx, y, row, family, o = {}) {
+  const {
+    left = 160,
+    right = 920,
+    value = 38,
+    label = 17,
+    barH = 12,
+    barOffset = 18,
+  } = o;
+  const mid = (left + right) / 2;
   const total = row.l + row.r;
   const lf = total > 0 ? row.l / total : 0.5;
   const leftWins = row.lowerWins ? row.l < row.r : row.l > row.r;
   const rightWins = row.lowerWins ? row.r < row.l : row.r > row.l;
 
   ctx.textBaseline = "alphabetic";
-  ctx.font = `900 38px ${family}`;
+  ctx.font = `900 ${value}px ${family}`;
   ctx.textAlign = "left";
   ctx.fillStyle = leftWins ? BLUE : "rgba(255,255,255,0.75)";
   ctx.fillText(row.lText, left, y);
@@ -158,58 +181,29 @@ function drawVsRow(ctx, y, row, family) {
   ctx.fillText(row.rText, right, y);
 
   ctx.textAlign = "center";
-  ctx.font = `800 17px ${family}`;
+  ctx.font = `800 ${label}px ${family}`;
   ctx.fillStyle = "rgba(255,255,255,0.5)";
   spaced(ctx, "4px");
-  ctx.fillText(row.label.toUpperCase(), 540, y - 4);
+  ctx.fillText(row.label.toUpperCase(), mid, y - 4);
   spaced(ctx, "0px");
 
-  const barY = y + 18;
+  const barY = y + barOffset;
   const barW = right - left;
   const gap = 5;
   const lw = Math.max(0, (barW - gap) * lf);
   ctx.fillStyle = BLUE;
-  ctx.fillRect(left, barY, lw, 12);
+  ctx.fillRect(left, barY, lw, barH);
   ctx.fillStyle = PINK;
-  ctx.fillRect(left + lw + gap, barY, barW - gap - lw, 12);
+  ctx.fillRect(left + lw + gap, barY, barW - gap - lw, barH);
 }
 
-export async function renderCompareCard({ me, them, both, spotlight, host }) {
-  try {
-    await document.fonts?.ready;
-  } catch {
-    /* ignore */
-  }
-  const family =
-    getComputedStyle(document.body).fontFamily || "system-ui, sans-serif";
-
-  const [avatarA, avatarB, art] = await Promise.all([
-    loadSteamImage(me.avatar),
-    loadSteamImage(them.avatar),
-    spotlight ? loadGameArt(spotlight.appid) : Promise.resolve(null),
-  ]);
-
-  const meStats = computeLibraryStats(me.library);
-  const themStats = computeLibraryStats(them.library);
-  const shared = both.length;
-  const score = computeMatchScore({
-    shared,
-    myCount: me.library.length,
-    theirCount: them.library.length,
-  });
-
-  const canvas = document.createElement("canvas");
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext("2d");
-
-  // ---- background -------------------------------------------------------
+function drawBackground(ctx, art, W, H, artH) {
   ctx.fillStyle = "#0a0d15";
   ctx.fillRect(0, 0, W, H);
   if (art) {
     ctx.save();
     ctx.globalAlpha = 0.4;
-    drawBlurred(ctx, art, -60, -60, W + 120, 1000);
+    drawBlurred(ctx, art, -60, -60, W + 120, artH);
     ctx.restore();
   }
   let g = ctx.createRadialGradient(0, 0, 0, 0, 0, 760);
@@ -228,11 +222,12 @@ export async function renderCompareCard({ me, them, both, spotlight, host }) {
   g.addColorStop(1, "rgba(10,13,21,0.96)");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
+}
 
-  // ---- brand row --------------------------------------------------------
+function drawBrand(ctx, family, W, y, size) {
   ctx.textBaseline = "alphabetic";
   ctx.textAlign = "left";
-  ctx.font = `900 34px ${family}`;
+  ctx.font = `900 ${size}px ${family}`;
   let bx = 64;
   for (const [text, color] of [
     ["FREE", "#fff"],
@@ -240,87 +235,66 @@ export async function renderCompareCard({ me, them, both, spotlight, host }) {
     ["TRACKER", "#fff"],
   ]) {
     ctx.fillStyle = color;
-    ctx.fillText(text, bx, 84);
+    ctx.fillText(text, bx, y);
     bx += ctx.measureText(text).width;
   }
+  // What the card is + when it was made (playtime keeps growing, so it's a
+  // snapshot — the date says which one).
+  const date = new Date()
+    .toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    })
+    .toUpperCase();
   ctx.textAlign = "right";
-  ctx.font = `800 18px ${family}`;
-  ctx.fillStyle = "rgba(255,255,255,0.55)";
-  spaced(ctx, "4px");
-  ctx.fillText("HEAD-TO-HEAD", W - 64, 82);
+  ctx.font = `800 ${Math.round(size * 0.5)}px ${family}`;
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  spaced(ctx, "3px");
+  ctx.fillText("STEAM LIBRARY COMPARISON", W - 64, y - Math.round(size * 0.36));
+  ctx.font = `700 ${Math.round(size * 0.46)}px ${family}`;
+  ctx.fillStyle = "rgba(255,255,255,0.45)";
+  spaced(ctx, "3px");
+  ctx.fillText(date, W - 64, y + Math.round(size * 0.34));
   spaced(ctx, "0px");
+}
 
-  // ---- players + match ring ----------------------------------------------
-  drawAvatar(ctx, avatarA, me, 250, 330, 210, BLUE, family);
-  drawAvatar(ctx, avatarB, them, 830, 330, 210, PINK, family);
-
-  ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
-  ctx.font = `900 44px ${family}`;
-  ctx.fillStyle = "#fff";
-  ctx.fillText(fit(ctx, me.name, 410), 250, 556);
-  ctx.fillText(fit(ctx, them.name, 410), 830, 556);
-  ctx.fillStyle = BLUE;
-  ctx.fillRect(250 - 30, 574, 60, 4);
-  ctx.fillStyle = PINK;
-  ctx.fillRect(830 - 30, 574, 60, 4);
-
-  const rcx = 540;
-  const rcy = 330;
-  const rr = 100;
-  ctx.lineWidth = 18;
+function drawRing(ctx, family, cx, cy, r, stroke, score, bigFont) {
+  ctx.lineWidth = stroke;
   ctx.beginPath();
-  ctx.arc(rcx, rcy, rr, 0, Math.PI * 2);
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(8,10,16,0.55)";
   ctx.fill();
   ctx.strokeStyle = "rgba(255,255,255,0.12)";
   ctx.stroke();
-  if (score != null) {
-    const lg = ctx.createLinearGradient(rcx - rr, rcy - rr, rcx + rr, rcy + rr);
-    lg.addColorStop(0, BLUE);
-    lg.addColorStop(1, PINK);
-    ctx.save();
-    ctx.shadowColor = "rgba(232,121,249,0.55)";
-    ctx.shadowBlur = 24;
-    ctx.strokeStyle = lg;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.arc(
-      rcx,
-      rcy,
-      rr,
-      -Math.PI / 2,
-      -Math.PI / 2 + (Math.PI * 2 * score) / 100,
-    );
-    ctx.stroke();
-    ctx.restore();
-    ctx.fillStyle = "#fff";
-    ctx.textBaseline = "middle";
-    ctx.font = `900 70px ${family}`;
-    ctx.fillText(`${score}%`, rcx, rcy - 6);
-    ctx.textBaseline = "alphabetic";
-    ctx.font = `800 16px ${family}`;
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
-    spaced(ctx, "5px");
-    ctx.fillText("MATCH", rcx, rcy + 40);
-    spaced(ctx, "0px");
+  const lg = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+  lg.addColorStop(0, BLUE);
+  lg.addColorStop(1, PINK);
+  ctx.save();
+  ctx.shadowColor = "rgba(232,121,249,0.55)";
+  ctx.shadowBlur = 24;
+  ctx.strokeStyle = lg;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * score) / 100);
+  ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle = "#fff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `900 ${bigFont}px ${family}`;
+  ctx.fillText(`${score}%`, cx, cy - bigFont * 0.08);
+  ctx.textBaseline = "alphabetic";
+  ctx.font = `800 ${Math.round(bigFont * 0.23)}px ${family}`;
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  spaced(ctx, "5px");
+  ctx.fillText("MATCH", cx, cy + bigFont * 0.55);
+  spaced(ctx, "0px");
+}
 
-    ctx.font = `900 22px ${family}`;
-    ctx.fillStyle = PINK;
-    spaced(ctx, "3px");
-    ctx.fillText(matchLabel(score).toUpperCase(), rcx, 478);
-    spaced(ctx, "0px");
-    ctx.font = `600 21px ${family}`;
-    ctx.fillStyle = "rgba(255,255,255,0.7)";
-    ctx.fillText(
-      `${shared} game${shared === 1 ? "" : "s"} in common`,
-      rcx,
-      510,
-    );
-  }
+const num = (n) => Math.round(n).toLocaleString("en-US");
 
-  // ---- head-to-head rows -------------------------------------------------
-  const num = (n) => Math.round(n).toLocaleString("en-US");
+function buildRows(me, them, meStats, themStats, withNever) {
   const rows = [];
   if (typeof me.level === "number" && typeof them.level === "number") {
     rows.push({
@@ -346,22 +320,76 @@ export async function renderCompareCard({ me, them, both, spotlight, host }) {
       lText: `${num(meStats.totalHours)}h`,
       rText: `${num(themStats.totalHours)}h`,
     },
-    {
+  );
+  if (withNever) {
+    rows.push({
       label: "Never played",
       l: meStats.neverPct,
       r: themStats.neverPct,
       lText: `${meStats.neverPct}%`,
       rText: `${themStats.neverPct}%`,
       lowerWins: true,
-    },
-  );
+    });
+  }
+  return rows;
+}
+
+// ---- 1080 x 1350 (phones, stories, WhatsApp) --------------------------------
+function drawPortrait(ctx, d) {
+  const {
+    me,
+    them,
+    art,
+    avatarA,
+    avatarB,
+    meStats,
+    themStats,
+    shared,
+    score,
+    spotlight,
+    host,
+    family,
+  } = d;
+  const { w: W, h: H } = SIZES.portrait;
+
+  drawBackground(ctx, art, W, H, 1000);
+  drawBrand(ctx, family, W, 84, 34);
+
+  drawAvatar(ctx, avatarA, me, 250, 330, 210, BLUE, family);
+  drawAvatar(ctx, avatarB, them, 830, 330, 210, PINK, family);
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  drawName(ctx, family, me.name, 250, 556, 410, 44, 30);
+  drawName(ctx, family, them.name, 830, 556, 410, 44, 30);
+  ctx.fillStyle = BLUE;
+  ctx.fillRect(250 - 30, 574, 60, 4);
+  ctx.fillStyle = PINK;
+  ctx.fillRect(830 - 30, 574, 60, 4);
+
+  if (score != null) {
+    drawRing(ctx, family, 540, 330, 100, 18, score, 70);
+    ctx.textAlign = "center";
+    ctx.font = `900 22px ${family}`;
+    ctx.fillStyle = PINK;
+    spaced(ctx, "3px");
+    ctx.fillText(matchLabel(score).toUpperCase(), 540, 478);
+    spaced(ctx, "0px");
+    ctx.font = `600 21px ${family}`;
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.fillText(
+      `${shared} game${shared === 1 ? "" : "s"} in common`,
+      540,
+      510,
+    );
+  }
+
   let y = 668;
-  for (const row of rows) {
+  for (const row of buildRows(me, them, meStats, themStats, true)) {
     drawVsRow(ctx, y, row, family);
     y += 78;
   }
 
-  // ---- top shared game ---------------------------------------------------
   if (spotlight) {
     const px = 64;
     const py = 960;
@@ -424,7 +452,6 @@ export async function renderCompareCard({ me, them, both, spotlight, host }) {
     });
   }
 
-  // ---- footer ------------------------------------------------------------
   const line = ctx.createLinearGradient(64, 0, W - 64, 0);
   line.addColorStop(0, BLUE);
   line.addColorStop(1, PINK);
@@ -439,6 +466,151 @@ export async function renderCompareCard({ me, them, both, spotlight, host }) {
   ctx.font = `600 22px ${family}`;
   ctx.fillStyle = "rgba(255,255,255,0.6)";
   ctx.fillText(host || "", W - 64, 1305);
+}
+
+// ---- 1200 x 630 (Discord, Twitter/X, link-preview shaped) --------------------
+function drawLandscape(ctx, d) {
+  const {
+    me,
+    them,
+    art,
+    avatarA,
+    avatarB,
+    meStats,
+    themStats,
+    shared,
+    score,
+    spotlight,
+    host,
+    family,
+  } = d;
+  const { w: W, h: H } = SIZES.landscape;
+
+  drawBackground(ctx, art, W, H, H + 120);
+  drawBrand(ctx, family, W, 62, 30);
+
+  // players on the sides
+  drawAvatar(ctx, avatarA, me, 185, 232, 170, BLUE, family);
+  drawAvatar(ctx, avatarB, them, W - 185, 232, 170, PINK, family);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  drawName(ctx, family, me.name, 185, 380, 300, 36, 24);
+  drawName(ctx, family, them.name, W - 185, 380, 300, 36, 24);
+  ctx.fillStyle = BLUE;
+  ctx.fillRect(185 - 26, 396, 52, 4);
+  ctx.fillStyle = PINK;
+  ctx.fillRect(W - 185 - 26, 396, 52, 4);
+
+  // middle: ring + three head-to-head rows
+  if (score != null) {
+    drawRing(ctx, family, 600, 168, 62, 13, score, 46);
+    ctx.textAlign = "center";
+    ctx.font = `900 18px ${family}`;
+    ctx.fillStyle = PINK;
+    spaced(ctx, "3px");
+    ctx.fillText(matchLabel(score).toUpperCase(), 600, 266);
+    spaced(ctx, "0px");
+    ctx.font = `600 17px ${family}`;
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.fillText(
+      `${shared} game${shared === 1 ? "" : "s"} in common`,
+      600,
+      291,
+    );
+  }
+  let y = 344;
+  for (const row of buildRows(me, them, meStats, themStats, false)) {
+    drawVsRow(ctx, y, row, family, {
+      left: 360,
+      right: 840,
+      value: 27,
+      label: 14,
+      barH: 9,
+      barOffset: 13,
+    });
+    y += 58;
+  }
+
+  // top shared game, one line
+  if (spotlight) {
+    ctx.textAlign = "center";
+    ctx.font = `900 14px ${family}`;
+    ctx.fillStyle = PINK;
+    spaced(ctx, "4px");
+    ctx.fillText("TOP SHARED GAME", 600, 524);
+    spaced(ctx, "0px");
+    ctx.font = `900 30px ${family}`;
+    ctx.fillStyle = "#fff";
+    ctx.fillText(fit(ctx, spotlight.name, 520), 600, 558);
+    ctx.font = `600 16px ${family}`;
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.fillText(
+      `${formatHours(spotlight.myPlaytime)} vs ${formatHours(spotlight.theirPlaytime)}`,
+      600,
+      582,
+    );
+  }
+
+  ctx.textBaseline = "alphabetic";
+  ctx.textAlign = "left";
+  ctx.font = `800 17px ${family}`;
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.fillText("Compare your own Steam library", 64, 604);
+  ctx.textAlign = "right";
+  ctx.font = `600 16px ${family}`;
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.fillText(host || "", W - 64, 604);
+}
+
+// format: "portrait" (1080 x 1350) or "landscape" (1200 x 630)
+export async function renderCompareCard({
+  me,
+  them,
+  both,
+  spotlight,
+  host,
+  format = "portrait",
+}) {
+  try {
+    await document.fonts?.ready;
+  } catch {
+    /* ignore */
+  }
+  const family =
+    getComputedStyle(document.body).fontFamily || "system-ui, sans-serif";
+
+  const [avatarA, avatarB, art] = await Promise.all([
+    loadSteamImage(me.avatar),
+    loadSteamImage(them.avatar),
+    spotlight ? loadGameArt(spotlight.appid) : Promise.resolve(null),
+  ]);
+
+  const data = {
+    me,
+    them,
+    art,
+    avatarA,
+    avatarB,
+    meStats: computeLibraryStats(me.library),
+    themStats: computeLibraryStats(them.library),
+    shared: both.length,
+    score: computeMatchScore({
+      shared: both.length,
+      myCount: me.library.length,
+      theirCount: them.library.length,
+    }),
+    spotlight,
+    host,
+    family,
+  };
+
+  const size = SIZES[format] || SIZES.portrait;
+  const canvas = document.createElement("canvas");
+  canvas.width = size.w;
+  canvas.height = size.h;
+  const ctx = canvas.getContext("2d");
+  if (format === "landscape") drawLandscape(ctx, data);
+  else drawPortrait(ctx, data);
 
   return new Promise((resolve, reject) =>
     canvas.toBlob(

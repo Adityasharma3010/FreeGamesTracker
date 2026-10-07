@@ -74,9 +74,10 @@ function Section({
       ) : (
         <>
           <div className={gridClass}>
-            {shown.map((g) => (
+            {shown.map((g, i) => (
               <CompareGameTile
                 key={g.appid}
+                index={i}
                 variant={variant}
                 game={g}
                 stats={statsFor ? statsFor(g) : []}

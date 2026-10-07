@@ -101,19 +101,54 @@ export default function PublicComparePage() {
             className="max-w-[1000px] mx-auto p-3 sm:p-5 border relative"
             style={{
               background: "rgba(8,10,16,0.62)",
+              boxShadow:
+                "0 0 90px rgba(47,180,255,0.08), 0 0 90px rgba(232,121,249,0.08)",
               borderColor: "rgba(255,255,255,0.08)",
               backdropFilter: "blur(10px)",
               WebkitBackdropFilter: "blur(10px)",
               color: "#fff",
             }}
           >
+            {valid && (
+              <p
+                className="mb-3 text-[10.5px] font-black uppercase tracking-[0.2em]"
+                style={{
+                  background: "linear-gradient(90deg, #2fb4ff, #e879f9)",
+                  WebkitBackgroundClip: "text",
+                  backgroundClip: "text",
+                  color: "transparent",
+                  width: "fit-content",
+                }}
+              >
+                Steam library comparison
+              </p>
+            )}
             {body}
-            <p className="mt-5 text-[11px]" style={{ color: pt.textFaint }}>
-              Both Steam profiles need to be public for this to work.{" "}
-              <Link to="/steam" className="underline">
-                See your own profile
+            <div
+              className="mt-6 flex flex-wrap items-center justify-between gap-3 px-4 py-3 border"
+              style={{
+                borderColor: "rgba(255,255,255,0.1)",
+                background:
+                  "linear-gradient(90deg, rgba(47,180,255,0.1), rgba(232,121,249,0.1))",
+              }}
+            >
+              <div>
+                <div className="text-[13px] font-black text-white">
+                  Curious how your library stacks up?
+                </div>
+                <div className="text-[11px]" style={{ color: pt.textDim }}>
+                  Sign in with Steam and compare with any friend. Both profiles
+                  need to be public.
+                </div>
+              </div>
+              <Link
+                to="/steam"
+                className="tap-target shrink-0 text-[10.5px] font-black uppercase tracking-wide px-4 py-2 transition-[filter] duration-150 hover:brightness-110"
+                style={{ background: "#2fb4ff", color: "#06121c" }}
+              >
+                Compare yours
               </Link>
-            </p>
+            </div>
           </div>
         </ThemeContext.Provider>
       </main>

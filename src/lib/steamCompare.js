@@ -42,6 +42,7 @@ export function compareLibraries({
   const mine = new Map(myLibrary.map((g) => [g.appid, g]));
   const theirs = new Map(theirLibrary.map((g) => [g.appid, g]));
   const theirWishIds = new Set(theirWishlist.map((g) => g.appid));
+  const theirWishNames = new Map(theirWishlist.map((g) => [g.appid, g.name]));
 
   const both = [];
   for (const g of theirLibrary) {
@@ -82,9 +83,21 @@ export function compareLibraries({
       };
     });
 
+  // The same game can come back as "App 123" from one player's wishlist
+  // and with its real name from the other's (Steam's name lookup misses
+  // now and then), so look at both wishlists — and both libraries, which
+  // always carry real names — before settling for the placeholder.
   const bothWant = myWishlist
     .filter((g) => theirWishIds.has(g.appid))
-    .map((g) => ({ appid: g.appid, name: bestName(g.name) }));
+    .map((g) => ({
+      appid: g.appid,
+      name: bestName(
+        g.name,
+        theirWishNames.get(g.appid),
+        mine.get(g.appid)?.name,
+        theirs.get(g.appid)?.name,
+      ),
+    }));
 
   return { both, theyOwnYourWishlist, youOwnTheirWishlist, bothWant };
 }

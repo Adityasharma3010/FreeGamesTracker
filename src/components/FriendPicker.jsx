@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { LuSearch, LuX } from "react-icons/lu";
 import { normalize } from "../lib/steamListControls.js";
+import { getRecentFriends } from "../lib/steamRecentFriends.js";
 
 // Session-level cache, same shape/TTL as the server's own — a second
 // open within 10 minutes doesn't even round-trip.
@@ -42,13 +43,61 @@ function useFriends(steamid) {
   return state;
 }
 
+function FriendRow({ friend: f, theme, onSelect }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(f.steamid)}
+      className="tap-target w-full flex items-center gap-2.5 px-3 py-2 text-left cursor-pointer transition-colors duration-150 hover:bg-white/10"
+    >
+      <div
+        className="relative w-8 h-8 shrink-0 rounded overflow-hidden"
+        style={{ background: theme.chipBg }}
+      >
+        {f.avatar && (
+          <img src={f.avatar} alt="" className="w-full h-full object-cover" />
+        )}
+      </div>
+      <span
+        className="text-[12.5px] font-bold truncate"
+        style={{ color: theme.text }}
+      >
+        {f.name}
+      </span>
+      {f.online && (
+        <span
+          className="ml-auto w-1.5 h-1.5 rounded-full shrink-0"
+          style={{ background: "#7dff70" }}
+          aria-label="Online"
+        />
+      )}
+    </button>
+  );
+}
+
 // `steamid` is the signed-in viewer's own — whose friends list this
 // shows. `onSelect(steamid)` fires with the chosen friend's id;
 // navigating from there is the caller's job (different callers want
 // different destinations — starting a Compare vs. just viewing them).
-export default function FriendPicker({ steamid, theme, onSelect, onClose }) {
+// `excludeSteamid` (optional) hides one friend from the Recent list —
+// e.g. the one whose Compare page you're already on.
+export default function FriendPicker({
+  steamid,
+  excludeSteamid,
+  theme,
+  onSelect,
+  onClose,
+}) {
   const [search, setSearch] = useState("");
   const state = useFriends(steamid);
+
+  // Friends you compared with before — shown above the full list while
+  // the search box is empty.
+  const recent = useMemo(
+    () => getRecentFriends(steamid).filter((f) => f.steamid !== excludeSteamid),
+    [steamid, excludeSteamid],
+  );
+  const showRecent = recent.length > 0 && !search.trim();
 
   const filtered = useMemo(() => {
     const q = normalize(search);
@@ -126,6 +175,33 @@ export default function FriendPicker({ steamid, theme, onSelect, onClose }) {
         </div>
 
         <div className="overflow-y-auto flex-1">
+          {showRecent && (
+            <>
+              <p
+                className="px-3 pt-2.5 pb-1 text-[10px] font-black uppercase tracking-wide"
+                style={{ color: theme.textFaint }}
+              >
+                Recent
+              </p>
+              {recent.map((f) => (
+                <FriendRow
+                  key={`recent-${f.steamid}`}
+                  friend={f}
+                  theme={theme}
+                  onSelect={onSelect}
+                />
+              ))}
+              <p
+                className="px-3 pt-3 pb-1 text-[10px] font-black uppercase tracking-wide border-t mt-1.5"
+                style={{
+                  color: theme.textFaint,
+                  borderColor: theme.surfaceBorder,
+                }}
+              >
+                All friends
+              </p>
+            </>
+          )}
           {state.status === "loading" && (
             <p className="p-4 text-[12px]" style={{ color: theme.textFaint }}>
               Loading friends…
@@ -155,38 +231,12 @@ export default function FriendPicker({ steamid, theme, onSelect, onClose }) {
               </p>
             )}
           {filtered.map((f) => (
-            <button
+            <FriendRow
               key={f.steamid}
-              type="button"
-              onClick={() => onSelect(f.steamid)}
-              className="tap-target w-full flex items-center gap-2.5 px-3 py-2 text-left cursor-pointer transition-colors duration-150 hover:bg-white/10"
-            >
-              <div
-                className="relative w-8 h-8 shrink-0 rounded overflow-hidden"
-                style={{ background: theme.chipBg }}
-              >
-                {f.avatar && (
-                  <img
-                    src={f.avatar}
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
-                )}
-              </div>
-              <span
-                className="text-[12.5px] font-bold truncate"
-                style={{ color: theme.text }}
-              >
-                {f.name}
-              </span>
-              {f.online && (
-                <span
-                  className="ml-auto w-1.5 h-1.5 rounded-full shrink-0"
-                  style={{ background: "#7dff70" }}
-                  aria-label="Online"
-                />
-              )}
-            </button>
+              friend={f}
+              theme={theme}
+              onSelect={onSelect}
+            />
           ))}
         </div>
       </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { LuDownload, LuShare2, LuX } from "react-icons/lu";
 import { renderCompareCard } from "../lib/compareCard.js";
@@ -20,38 +20,55 @@ export default function CompareCardModal({
   theme,
   onClose,
 }) {
-  const [state, setState] = useState({
-    status: "loading",
-    blob: null,
-    url: null,
-  });
-  const filename = `fgt-${slug(me.name)}-vs-${slug(them.name)}.png`;
+  const [format, setFormat] = useState("portrait"); // "portrait" | "landscape"
+  const [cards, setCards] = useState({}); // format -> { status, blob, url }
+  // Levels load a moment after the page does; if one arrives while the
+  // window is open, the card is simply drawn again with it.
+  const cacheKey = `${format}|${me.level ?? ""}|${them.level ?? ""}`;
+  const state = cards[cacheKey] || { status: "loading", blob: null, url: null };
+  const filename = `fgt-${slug(me.name)}-vs-${slug(them.name)}${format === "landscape" ? "-wide" : ""}.png`;
 
+  // Each shape is drawn the first time it's shown, then kept.
   useEffect(() => {
+    if (cards[cacheKey]) return;
     let cancelled = false;
-    let objectUrl = null;
     renderCompareCard({
       me,
       them,
       both,
       spotlight,
       host: window.location.host,
+      format,
     })
       .then((blob) => {
         if (cancelled) return;
-        objectUrl = URL.createObjectURL(blob);
-        setState({ status: "ready", blob, url: objectUrl });
+        const url = URL.createObjectURL(blob);
+        setCards((c) => ({ ...c, [cacheKey]: { status: "ready", blob, url } }));
       })
       .catch(() => {
-        if (!cancelled) setState({ status: "error", blob: null, url: null });
+        if (!cancelled)
+          setCards((c) => ({
+            ...c,
+            [cacheKey]: { status: "error", blob: null, url: null },
+          }));
       });
     return () => {
       cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-    // The card is drawn once per open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [cacheKey]);
+
+  // Free the generated images when the window closes.
+  const cardsRef = useRef(cards);
+  cardsRef.current = cards;
+  useEffect(
+    () => () => {
+      Object.values(cardsRef.current).forEach(
+        (c) => c?.url && URL.revokeObjectURL(c.url),
+      );
+    },
+    [],
+  );
 
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && onClose();
@@ -98,7 +115,7 @@ export default function CompareCardModal({
         onClick={onClose}
       />
       <div
-        className="relative flex flex-col gap-3 max-h-[94vh] max-w-[min(94vw,520px)] p-3 border-2"
+        className="relative flex flex-col gap-3 max-h-[94vh] w-[min(94vw,760px)] p-3 border-2"
         style={{
           background: theme.panelBg || "#0b0e16",
           borderColor: "#e879f9",
@@ -122,6 +139,29 @@ export default function CompareCardModal({
           </button>
         </div>
 
+        <div className="flex gap-1.5" role="tablist" aria-label="Card shape">
+          {[
+            ["portrait", "Portrait"],
+            ["landscape", "Wide"],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={format === key}
+              onClick={() => setFormat(key)}
+              className="tap-target text-[10.5px] font-black uppercase tracking-wide px-3 py-1.5 border cursor-pointer transition-colors duration-150"
+              style={{
+                background: format === key ? "#e879f9" : "transparent",
+                color: format === key ? "#1a0620" : theme.textFaint,
+                borderColor: format === key ? "#e879f9" : theme.surfaceBorder,
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         <div className="min-h-0 overflow-auto flex items-center justify-center">
           {state.status === "loading" && (
             <p className="py-24 text-[12px]" style={{ color: theme.textDim }}>
@@ -137,7 +177,7 @@ export default function CompareCardModal({
             <img
               src={state.url}
               alt={`${me.name} vs ${them.name} comparison card`}
-              className="block max-h-[68vh] w-auto max-w-full"
+              className="block max-h-[62vh] w-auto max-w-full"
             />
           )}
         </div>
@@ -168,7 +208,8 @@ export default function CompareCardModal({
               )}
             </div>
             <p className="text-[10.5px]" style={{ color: theme.textFaint }}>
-              On a phone you can also press and hold the image to save it.
+              Portrait suits phones and stories, Wide suits Discord and X. On a
+              phone you can also press and hold the image to save it.
             </p>
           </>
         )}

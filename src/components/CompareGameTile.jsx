@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { LuTrophy } from "react-icons/lu";
 import { SiSteam } from "react-icons/si";
 import SteamGameImage from "./SteamGameImage.jsx";
+import { useInViewOnce } from "../hooks/useInViewOnce.js";
 import { formatHours } from "../lib/steamCompare.js";
 
 // One game in the Compare page's lists. `stats` is who-has-how-many-hours:
@@ -46,7 +47,7 @@ function Trophy({ game, onAchievements, className }) {
 
 // Hours line(s) under a game: a two-colour tug-of-war bar when both
 // players own it, a coloured "name · hours" line when only one does.
-function StatLine({ stats }) {
+function StatLine({ stats, shown, delay }) {
   if (stats.length === 2) {
     const [x, y] = stats;
     const total = x.minutes + y.minutes;
@@ -62,17 +63,21 @@ function StatLine({ stats }) {
         </div>
         <div className="flex h-1 gap-[2px] mt-1">
           <div
+            className="motion-reduce:transition-none"
             style={{
-              flexGrow: Math.max(lf, 0.001),
+              flexGrow: shown ? Math.max(lf, 0.001) : 0.5,
               flexBasis: 0,
               background: x.color,
+              transition: `flex-grow 1000ms cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms`,
             }}
           />
           <div
+            className="motion-reduce:transition-none"
             style={{
-              flexGrow: Math.max(1 - lf, 0.001),
+              flexGrow: shown ? Math.max(1 - lf, 0.001) : 0.5,
               flexBasis: 0,
               background: y.color,
+              transition: `flex-grow 1000ms cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms`,
             }}
           />
         </div>
@@ -100,8 +105,11 @@ export default function CompareGameTile({
   theme,
   onSelect,
   onAchievements,
+  index = 0,
 }) {
   const [failed, setFailed] = useState(false);
+  const [ref, shown] = useInViewOnce();
+  const delay = Math.min(index, 11) * 60; // gentle stagger down the grid
   const open = () => onSelect?.({ appid: game.appid, name: game.name });
   const art = (
     <Art appid={game.appid} failed={failed} onFailed={() => setFailed(true)} />
@@ -110,6 +118,7 @@ export default function CompareGameTile({
   if (variant === "overlay") {
     return (
       <div
+        ref={ref}
         className="group relative overflow-hidden border aspect-[460/215] transition duration-200 hover:-translate-y-0.5 hover:border-white/40 hover:shadow-[0_10px_28px_-10px_rgba(232,121,249,0.55)]"
         style={{ background: "#0b0e16", borderColor: theme.surfaceBorder }}
       >
@@ -159,6 +168,7 @@ export default function CompareGameTile({
   // "split" (default): art, then name + a tug-of-war bar underneath.
   return (
     <div
+      ref={ref}
       className="group relative border transition duration-200 hover:-translate-y-0.5 hover:border-white/30 hover:shadow-[0_10px_28px_-12px_rgba(47,180,255,0.6)]"
       style={{ background: theme.surface, borderColor: theme.surfaceBorder }}
     >
@@ -178,7 +188,7 @@ export default function CompareGameTile({
           >
             {game.name}
           </div>
-          <StatLine stats={stats} />
+          <StatLine stats={stats} shown={shown} delay={delay} />
         </div>
       </button>
       <Trophy
