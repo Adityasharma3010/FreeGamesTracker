@@ -84,6 +84,46 @@ function StatLine({ stats, shown, delay }) {
       </div>
     );
   }
+  if (stats.length >= 3) {
+    // Three or more players: one stacked bar split by who played most,
+    // with each player's hours in their own colour underneath.
+    const total = stats.reduce((sum, x) => sum + x.minutes, 0);
+    return (
+      <div
+        className="mt-1.5"
+        title={stats
+          .map((x) => `${x.name} ${formatHours(x.minutes)}`)
+          .join(" · ")}
+      >
+        <div className="flex h-1 gap-[2px]">
+          {stats.map((x) => (
+            <div
+              key={x.name + x.color}
+              className="motion-reduce:transition-none"
+              style={{
+                flexGrow: shown
+                  ? Math.max(
+                      total > 0 ? x.minutes / total : 1 / stats.length,
+                      0.001,
+                    )
+                  : 1 / stats.length,
+                flexBasis: 0,
+                background: x.color,
+                transition: `flex-grow 1000ms cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms`,
+              }}
+            />
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-x-2 mt-1 text-[10.5px] font-black tabular-nums">
+          {stats.map((x) => (
+            <span key={x.name + x.color} style={{ color: x.color }}>
+              {x.label ?? formatHours(x.minutes)}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
   if (stats.length === 1) {
     const [x] = stats;
     return (
@@ -91,7 +131,7 @@ function StatLine({ stats, shown, delay }) {
         className="mt-1 text-[11px] font-black truncate"
         style={{ color: x.color }}
       >
-        {x.name} · {formatHours(x.minutes)}
+        {x.name} · {x.label ?? formatHours(x.minutes)}
       </div>
     );
   }
@@ -105,6 +145,7 @@ export default function CompareGameTile({
   theme,
   onSelect,
   onAchievements,
+  note,
   index = 0,
 }) {
   const [failed, setFailed] = useState(false);
@@ -140,11 +181,11 @@ export default function CompareGameTile({
               {stats.map((s) => (
                 <span
                   key={s.name}
-                  title={`${s.name} ${formatHours(s.minutes)}`}
+                  title={`${s.name} ${s.label ?? formatHours(s.minutes)}`}
                   className="px-1.5 py-0.5 text-[10px] font-black"
                   style={{ background: s.color, color: "#06121c" }}
                 >
-                  {formatHours(s.minutes)}
+                  {s.label ?? formatHours(s.minutes)}
                 </span>
               ))}
             </div>
@@ -189,6 +230,15 @@ export default function CompareGameTile({
             {game.name}
           </div>
           <StatLine stats={stats} shown={shown} delay={delay} />
+          {note && (
+            <div
+              className="mt-1 text-[10.5px] truncate"
+              style={{ color: theme.textDim }}
+              title={typeof note === "string" ? note : undefined}
+            >
+              {note}
+            </div>
+          )}
         </div>
       </button>
       <Trophy

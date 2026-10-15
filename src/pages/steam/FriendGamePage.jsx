@@ -10,22 +10,10 @@ function GamePageSkeleton({ theme }) {
       aria-label="Loading game"
       role="status"
     >
-      <div
-        className="h-3 w-16 rounded motion-safe:animate-pulse"
-        style={{ background: theme.chipBg }}
-      />
-      <div
-        className="w-full aspect-[460/215] motion-safe:animate-pulse"
-        style={{ background: theme.chipBg }}
-      />
-      <div
-        className="h-5 w-2/3 rounded motion-safe:animate-pulse"
-        style={{ background: theme.chipBg }}
-      />
-      <div
-        className="h-3 w-24 rounded motion-safe:animate-pulse"
-        style={{ background: theme.chipBg }}
-      />
+      <div className="h-3 w-16 rounded img-shimmer" />
+      <div className="w-full aspect-[460/215] img-shimmer" />
+      <div className="h-5 w-2/3 rounded img-shimmer" />
+      <div className="h-3 w-24 rounded img-shimmer" />
     </div>
   );
 }

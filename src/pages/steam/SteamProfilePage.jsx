@@ -14,6 +14,7 @@ export default function SteamProfilePage() {
   const { matches, matchAppIds } = useSteamMatches();
   const navigate = useNavigate();
   const [picking, setPicking] = useState(false);
+  const [pickingGroup, setPickingGroup] = useState(false);
   // The friend you compared with most recently (one-click shortcut).
   const lastFriend = steam.connected
     ? getRecentFriends(steam.steamid)[0]
@@ -47,6 +48,14 @@ export default function SteamProfilePage() {
           )}
           <button
             type="button"
+            onClick={() => setPickingGroup(true)}
+            className="tap-target flex items-center gap-1.5 text-[10.5px] font-black uppercase tracking-wide px-3 py-1.5 border-2 cursor-pointer transition-colors duration-150 hover:bg-white/10"
+            style={{ borderColor: theme.panelBorder, color: theme.textFaint }}
+          >
+            <LuUsers size={12} /> Compare several
+          </button>
+          <button
+            type="button"
             onClick={() => setPicking(true)}
             className="tap-target flex items-center gap-1.5 text-[10.5px] font-black uppercase tracking-wide px-3 py-1.5 border-2 cursor-pointer transition-colors duration-150"
             style={{
@@ -66,6 +75,18 @@ export default function SteamProfilePage() {
           onClose={() => setPicking(false)}
           onSelect={(friendSteamid) =>
             navigate(`/steam/friend/${friendSteamid}/compare`)
+          }
+        />
+      )}
+      {pickingGroup && (
+        <FriendPicker
+          steamid={steam.steamid}
+          theme={theme}
+          multiple
+          maxPick={5}
+          onClose={() => setPickingGroup(false)}
+          onConfirm={(ids) =>
+            navigate(`/steam/group/${[steam.steamid, ...ids].join(",")}`)
           }
         />
       )}

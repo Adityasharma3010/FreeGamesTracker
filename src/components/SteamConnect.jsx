@@ -7,6 +7,7 @@ import { useGiveaways } from "../hooks/useGiveaways.js";
 import { extractSteamAppId } from "../lib/steamMatch.js";
 import { SiSteam } from "react-icons/si";
 import SteamGameImage from "./SteamGameImage.jsx";
+import { useScrollLock } from "../hooks/useScrollLock.js";
 import { LuX } from "react-icons/lu";
 
 export function GameTile({
@@ -114,17 +115,14 @@ export function GameTile({
 
 export function TileSkeleton({ index }) {
   return (
-    <div
-      style={{ animationDelay: `${index * 60}ms` }}
-      className="motion-safe:animate-pulse flex flex-col overflow-hidden border border-transparent"
-    >
+    <div className="flex flex-col overflow-hidden border border-transparent">
       <div
-        className="w-full aspect-[460/215] rounded-sm"
-        style={{ background: "rgba(127,127,127,0.15)" }}
+        className="img-shimmer w-full aspect-[460/215] rounded-sm"
+        style={{ animationDelay: `${index * 60}ms` }}
       />
       <div
-        className="h-2.5 w-3/4 rounded-full mt-1.5"
-        style={{ background: "rgba(127,127,127,0.15)" }}
+        className="img-shimmer h-2.5 w-3/4 rounded-full mt-1.5"
+        style={{ animationDelay: `${index * 60}ms` }}
       />
     </div>
   );
@@ -225,11 +223,7 @@ export function GameDetailView({ game, theme, highlight, onBack }) {
       {details === null && (
         <div className="flex gap-2">
           {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="h-3 rounded-full flex-1 motion-safe:animate-pulse"
-              style={{ background: theme.chipBg }}
-            />
+            <div key={i} className="h-3 rounded-full flex-1 img-shimmer" />
           ))}
         </div>
       )}
@@ -314,6 +308,7 @@ export default function SteamConnect() {
   } = useSteam();
   const { giveaways } = useGiveaways();
   const [open, setOpen] = useState(false);
+  useScrollLock(open);
   const [tab, setTab] = useState("matches"); // matches | wishlist | library
   const [input, setInput] = useState("");
   const [showManual, setShowManual] = useState(false);

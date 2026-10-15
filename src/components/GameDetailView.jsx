@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { SiSteam } from "react-icons/si";
 import SteamGameImage from "./SteamGameImage.jsx";
 import ImageLightbox from "./ImageLightbox.jsx";
+import { useScrollLock } from "../hooks/useScrollLock.js";
 import {
   LuPlay,
   LuChevronLeft,
@@ -249,36 +250,29 @@ export default function GameDetailView({
             {[52, 68, 44].map((w, i) => (
               <div
                 key={i}
-                className="h-5 rounded motion-safe:animate-pulse"
-                style={{ width: w, background: theme.chipBg }}
+                className="h-5 rounded img-shimmer"
+                style={{ width: w }}
               />
             ))}
           </div>
           <div className="flex flex-col gap-2">
             <div
-              className="h-3.5 rounded-full motion-safe:animate-pulse"
-              style={{ background: theme.chipBg, width: "95%" }}
+              className="h-3.5 rounded-full img-shimmer"
+              style={{ width: "95%" }}
             />
             <div
-              className="h-3.5 rounded-full motion-safe:animate-pulse"
-              style={{ background: theme.chipBg, width: "88%" }}
+              className="h-3.5 rounded-full img-shimmer"
+              style={{ width: "88%" }}
             />
             <div
-              className="h-3.5 rounded-full motion-safe:animate-pulse"
-              style={{ background: theme.chipBg, width: "60%" }}
+              className="h-3.5 rounded-full img-shimmer"
+              style={{ width: "60%" }}
             />
           </div>
-          <div
-            className="w-full aspect-video motion-safe:animate-pulse"
-            style={{ background: theme.chipBg }}
-          />
+          <div className="w-full aspect-video img-shimmer" />
           <div className="flex gap-2">
             {[0, 1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="h-16 aspect-video shrink-0 motion-safe:animate-pulse"
-                style={{ background: theme.chipBg }}
-              />
+              <div key={i} className="h-16 aspect-video shrink-0 img-shimmer" />
             ))}
           </div>
         </div>
@@ -841,6 +835,7 @@ function NewsModal({ news, theme, onClose }) {
         : [];
   const imageUrls = blocks.filter((b) => b.type === "image").map((b) => b.src);
   const [lightboxIndex, setLightboxIndex] = useState(null);
+  useScrollLock();
 
   return createPortal(
     <div

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { LuDownload, LuShare2, LuX } from "react-icons/lu";
 import { renderCompareCard } from "../lib/compareCard.js";
+import { useScrollLock } from "../hooks/useScrollLock.js";
 
 const slug = (s) =>
   String(s || "player")
@@ -20,6 +21,7 @@ export default function CompareCardModal({
   theme,
   onClose,
 }) {
+  useScrollLock();
   const [format, setFormat] = useState("portrait"); // "portrait" | "landscape"
   const [cards, setCards] = useState({}); // format -> { status, blob, url }
   // Levels load a moment after the page does; if one arrives while the

@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { LuSearch, LuX } from "react-icons/lu";
+import { createPortal } from "react-dom";
+import { useScrollLock } from "../hooks/useScrollLock.js";
+import { LuCheck, LuSearch, LuX } from "react-icons/lu";
 import { normalize } from "../lib/steamListControls.js";
 import { getRecentFriends } from "../lib/steamRecentFriends.js";
 
@@ -43,13 +45,34 @@ function useFriends(steamid) {
   return state;
 }
 
-function FriendRow({ friend: f, theme, onSelect }) {
+function FriendRow({
+  friend: f,
+  theme,
+  onSelect,
+  multiple,
+  selected,
+  disabled,
+}) {
   return (
     <button
       type="button"
       onClick={() => onSelect(f.steamid)}
-      className="tap-target w-full flex items-center gap-2.5 px-3 py-2 text-left cursor-pointer transition-colors duration-150 hover:bg-white/10"
+      disabled={disabled}
+      aria-pressed={multiple ? !!selected : undefined}
+      className="tap-target w-full flex items-center gap-2.5 px-3 py-2 text-left cursor-pointer transition-colors duration-150 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
     >
+      {multiple && (
+        <span
+          className="w-4 h-4 shrink-0 flex items-center justify-center border-2"
+          style={{
+            borderColor: selected ? "#e879f9" : theme.textFaint,
+            background: selected ? "#e879f9" : "transparent",
+            color: "#1a0620",
+          }}
+        >
+          {selected && <LuCheck size={11} strokeWidth={4} />}
+        </span>
+      )}
       <div
         className="relative w-8 h-8 shrink-0 rounded overflow-hidden"
         style={{ background: theme.chipBg }}
@@ -81,15 +104,39 @@ function FriendRow({ friend: f, theme, onSelect }) {
 // different destinations — starting a Compare vs. just viewing them).
 // `excludeSteamid` (optional) hides one friend from the Recent list —
 // e.g. the one whose Compare page you're already on.
+// `multiple` turns it into a "pick several" list: rows toggle (up to
+// `maxPick`) and a button at the bottom calls `onConfirm(steamids)`.
 export default function FriendPicker({
   steamid,
   excludeSteamid,
   theme,
   onSelect,
+  multiple = false,
+  maxPick = 5,
+  onConfirm,
   onClose,
 }) {
   const [search, setSearch] = useState("");
+  const [picked, setPicked] = useState([]);
+  const toggle = (id) =>
+    setPicked((p) =>
+      p.includes(id)
+        ? p.filter((x) => x !== id)
+        : p.length < maxPick
+          ? [...p, id]
+          : p,
+    );
+  const rowProps = (f) =>
+    multiple
+      ? {
+          multiple: true,
+          selected: picked.includes(f.steamid),
+          disabled: !picked.includes(f.steamid) && picked.length >= maxPick,
+          onSelect: toggle,
+        }
+      : { onSelect };
   const state = useFriends(steamid);
+  useScrollLock();
 
   // Friends you compared with before — shown above the full list while
   // the search box is empty.
@@ -111,12 +158,15 @@ export default function FriendPicker({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  return (
+  // Portaled to <body>: the Steam panel has a backdrop blur, which makes it
+  // the reference box for `position: fixed` children — so the popup was
+  // centered inside the (tall) panel instead of the screen.
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
-      aria-label="Choose a friend"
+      aria-label={multiple ? "Choose friends" : "Choose a friend"}
     >
       <div
         className="absolute inset-0"
@@ -135,7 +185,7 @@ export default function FriendPicker({
             className="text-[12px] font-black uppercase tracking-wide"
             style={{ color: theme.text }}
           >
-            Compare with a friend
+            {multiple ? "Compare several friends" : "Compare with a friend"}
           </h2>
           <button
             type="button"
@@ -188,7 +238,7 @@ export default function FriendPicker({
                   key={`recent-${f.steamid}`}
                   friend={f}
                   theme={theme}
-                  onSelect={onSelect}
+                  {...rowProps(f)}
                 />
               ))}
               <p
@@ -235,11 +285,34 @@ export default function FriendPicker({
               key={f.steamid}
               friend={f}
               theme={theme}
-              onSelect={onSelect}
+              {...rowProps(f)}
             />
           ))}
         </div>
+
+        {multiple && (
+          <div
+            className="flex items-center justify-between gap-3 px-3 py-2.5 border-t shrink-0"
+            style={{ borderColor: theme.surfaceBorder }}
+          >
+            <span className="text-[11px]" style={{ color: theme.textDim }}>
+              {picked.length === 0
+                ? `Pick 2 to ${maxPick} friends`
+                : `${picked.length} selected${picked.length < 2 ? " — pick at least 2" : ""}`}
+            </span>
+            <button
+              type="button"
+              disabled={picked.length < 2}
+              onClick={() => onConfirm?.(picked)}
+              className="tap-target shrink-0 text-[10.5px] font-black uppercase tracking-wide px-3 py-1.5 cursor-pointer transition-[filter] duration-150 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: "#e879f9", color: "#1a0620" }}
+            >
+              Compare
+            </button>
+          </div>
+        )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

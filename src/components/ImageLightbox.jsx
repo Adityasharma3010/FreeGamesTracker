@@ -1,12 +1,14 @@
 import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { LuChevronLeft, LuChevronRight, LuX } from "react-icons/lu";
+import { useScrollLock } from "../hooks/useScrollLock.js";
 
 // Full-screen image viewer. Portaled to <body> so it sits above the Nav
 // (page content lives in its own stacking context). Shared between the
 // screenshot gallery and news-post images — `images` is a plain array of
 // URL strings either way.
 export default function ImageLightbox({ images, index, setIndex, onClose }) {
+  useScrollLock();
   const go = (dir) => setIndex((index + dir + images.length) % images.length);
 
   useEffect(() => {

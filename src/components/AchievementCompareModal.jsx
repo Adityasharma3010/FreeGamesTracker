@@ -1,3 +1,5 @@
+import { createPortal } from "react-dom";
+import { useScrollLock } from "../hooks/useScrollLock.js";
 import React, { useEffect, useState } from "react";
 import { LuCheck, LuX, LuMinus } from "react-icons/lu";
 import { mergeAchievementCompare } from "../lib/steamCompare.js";
@@ -22,6 +24,7 @@ export default function AchievementCompareModal({
   theme,
   onClose,
 }) {
+  useScrollLock();
   const me = myName || "You";
   const [state, setState] = useState({ status: "loading", merged: null });
 
@@ -55,7 +58,9 @@ export default function AchievementCompareModal({
 
   const m = state.merged;
 
-  return (
+  // Portaled to <body> (the Steam panel's backdrop blur would otherwise
+  // make it the reference box for `fixed`, off-centering the popup).
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
@@ -197,7 +202,8 @@ export default function AchievementCompareModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

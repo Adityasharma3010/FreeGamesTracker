@@ -200,34 +200,18 @@ export default function SteamProfileView({
         aria-label="Loading Steam profile"
         role="status"
       >
-        <div
-          className="h-56 motion-safe:animate-pulse"
-          style={{ background: theme.chipBg }}
-        />
+        <div className="h-56 img-shimmer" />
         <div className="grid grid-cols-3 gap-3">
           {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="h-16 motion-safe:animate-pulse"
-              style={{ background: theme.chipBg }}
-            />
+            <div key={i} className="h-16 img-shimmer" />
           ))}
         </div>
         <div className="grid lg:grid-cols-[1fr_260px] gap-4 items-start">
           <div className="flex flex-col gap-3">
-            <div
-              className="h-40 motion-safe:animate-pulse"
-              style={{ background: theme.chipBg }}
-            />
-            <div
-              className="h-40 motion-safe:animate-pulse"
-              style={{ background: theme.chipBg }}
-            />
+            <div className="h-40 img-shimmer" />
+            <div className="h-40 img-shimmer" />
           </div>
-          <div
-            className="h-48 motion-safe:animate-pulse"
-            style={{ background: theme.chipBg }}
-          />
+          <div className="h-48 img-shimmer" />
         </div>
       </div>
     );

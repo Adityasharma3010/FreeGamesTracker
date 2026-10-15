@@ -23,6 +23,7 @@ import FriendMatchesPage from "./pages/steam/FriendMatchesPage.jsx";
 import FriendComparePage from "./pages/steam/FriendComparePage.jsx";
 import FriendGamePage from "./pages/steam/FriendGamePage.jsx";
 import PublicComparePage from "./pages/steam/PublicComparePage.jsx";
+import GroupComparePage from "./pages/steam/GroupComparePage.jsx";
 
 function endTimestamp(g) {
   if (!g.end_date || g.end_date === "N/A") return Infinity; // no end date sorts last
@@ -156,6 +157,7 @@ export default function App() {
         <Route path="game/:appid" element={<FriendGamePage />} />
       </Route>
       <Route path="/steam/compare/:a/:b" element={<PublicComparePage />} />
+      <Route path="/steam/group/:ids" element={<GroupComparePage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

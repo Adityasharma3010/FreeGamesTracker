@@ -14,11 +14,7 @@ export default function FriendMatchesPage() {
         role="status"
       >
         {[0, 1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className="h-12 motion-safe:animate-pulse"
-            style={{ background: theme.chipBg }}
-          />
+          <div key={i} className="h-12 img-shimmer" />
         ))}
       </div>
     );
